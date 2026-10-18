@@ -22,7 +22,7 @@ Hazır paketler [Releases](../../releases) sayfasındadır:
 - **Zil Saatleri:** Hafta İçi / Cumartesi / Pazar için ayrı, 16 derse kadar; öğrenci zili dersten 15 sn – 3 dk önce, öğretmen zili ders başında, teneffüs zili ders sonunda
 - **Melodiler:** öğrenci, öğretmen ve teneffüs zili için ayrı melodi ve ses seviyesi; günün son zili için ayrı "Son Zil" (varsayılan MEB Çıkış Zili); dosya ekleme düğmesi
 - Çalan sesin adı, süresi ve ilerleme çubuğu üst bilgide görünür
-- **Müzik ve Marşlar:** teneffüste rastgele müzik (sonraki zilden 30 sn önce yavaşça susar), İstiklal Marşı / Saygı Duruşu / Siren
+- **Müzik ve Marşlar:** teneffüste rastgele müzik (sonraki zilden 30 sn önce yavaşça susar), İstiklal Marşı, İstiklal Marşı (Enstrümental), Saygı Duruşu + İstiklal Marşı ve Siren
 - **Ayarlar:** 18 tema (açık ve koyu), açılışta otomatik başlatma
 - **Sistem tepsisi:** pencere kapatılırken küçültme sorulur; küçültülünce görev çubuğunda yer kaplamaz, tepsi simgesinden açılır. Linux'ta StatusNotifierItem (KDE, GNOME AppIndicator, XFCE, Cinnamon), yoksa eski XEmbed tepsisi kullanılır
 - Bilgisayar uykudan uyanırsa 1 dakikadan eski zilleri çalmaz; aynı anda iki kopya açılmaz; ayarlar elektrik kesintisinde bozulmaz
@@ -66,6 +66,7 @@ packaging/linux/build.sh     # AppImage + .deb  (docker gerekir)
 packaging/windows/build.sh   # Windows kurulumu (wine gerekir)
 ```
 
+- Derleme betikleri indirdikleri her dosyayı sha256 ile doğrular; kütüphaneler `packaging/*/requirements.lock` dosyalarından `--require-hashes` ile kurulur. `requirements.txt` değişince `packaging/lock.sh` çalıştırın.
 - Linux paketleri Ubuntu 18.04 kapsayıcısında kaynaktan derlenen Python 3.8 + Tk 8.6 (düzgün yazı tipleri için Xft) ile hazırlanır, hedef sistemde Python gerekmez.
 - Windows paketi resmi 32 bit Python 3.7.9, PyInstaller 5.13.2 ve Inno Setup 6.2.2 ile hazırlanır. Python 3.8+ Windows 7'de KB2533623 güncellemesi olmadan açılmaz; bu yüzden 3.7.9'da kalın. Microsoft'un Universal C Runtime DLL'leri programın yanına konur, böylece KB2999226 da gerekmez.
 - Programla gelen sesler `sounds/` klasöründedir (Melodiler, Marşlar). Program müzik içermez; teneffüs müziğini kullanıcı "Müzik ekle…" ile ekler.

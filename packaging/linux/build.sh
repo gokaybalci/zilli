@@ -7,10 +7,16 @@ cd "$(dirname "$0")/../.."           # zilli/
 SOUNDS=${SOUNDS:-sounds}             # Melodiler/Marşlar klasörlerinin olduğu yer
 VERSION=$(sed -n 's/^APP, VERSION = "Zilli", "\(.*\)"/\1/p' zilli.py)
 PYVER=3.8.20
+# indirilen her dosya sha256 ile doğrulanır (Python: python.org MD5'iyle karşılaştırıldı; diğerleri yayıncının
+# GitHub özetiyle). Docker imajı özetle sabit; kütüphaneler packaging/linux/requirements.lock'tan (lock.sh).
+IMAGE=ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
+PY_SHA=9f2d5962c2583e67ef75924cd56d0c1af78bf45ec57035cf8a2cc09f74f4bf78
+TOOL_URL=https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+TOOL_SHA=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
 mkdir -p dist build
 
 docker run --rm -v "$PWD:/src" -v "$(realpath "$SOUNDS"):/sounds:ro" -e VERSION="$VERSION" -e PYVER=$PYVER \
-    -e HOST_UID="$(id -u):$(id -g)" ubuntu:18.04 bash -euo pipefail -c '
+    -e HOST_UID="$(id -u):$(id -g)" -e PY_SHA=$PY_SHA $IMAGE bash -euo pipefail -c '
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq build-essential curl ca-certificates tk-dev libssl-dev zlib1g-dev libffi-dev \
@@ -18,13 +24,15 @@ apt-get install -y -qq build-essential curl ca-certificates tk-dev libssl-dev zl
 
 B=/build/opt/zilli
 P=$B/python
-cd /tmp && curl -sSL https://www.python.org/ftp/python/$PYVER/Python-$PYVER.tgz | tar xz && cd Python-$PYVER
-./configure -q --prefix=$P --enable-shared --without-ensurepip >/dev/null
+cd /tmp && curl -fsSL -o py.tgz https://www.python.org/ftp/python/$PYVER/Python-$PYVER.tgz
+echo "$PY_SHA  py.tgz" | sha256sum -c --quiet
+tar xzf py.tgz && cd Python-$PYVER
+./configure -q --prefix=$P --enable-shared >/dev/null   # pip, doğrulanan kaynak paketinin içinden gelir
 make -j"$(nproc)" >/dev/null 2>&1 && make install >/dev/null 2>&1
 export LD_LIBRARY_PATH=$P/lib
 $P/bin/python3 -c "import tkinter, ssl, lzma, bz2, zlib, ctypes"   # gerekli modüller derlendi mi
-curl -sSL https://bootstrap.pypa.io/pip/3.8/get-pip.py | $P/bin/python3 - -q --no-warn-script-location
-$P/bin/python3 -m pip install -q --no-warn-script-location -r /src/requirements.txt
+$P/bin/python3 -m pip install -q --no-warn-script-location --disable-pip-version-check --require-hashes \
+    --only-binary :all: -r /src/packaging/linux/requirements.lock
 
 # Tcl/Tk ve Xft paketin içine: hedef sistemde tk kurulu olmasa da çalışsın
 L=/usr/lib/x86_64-linux-gnu
@@ -95,7 +103,9 @@ A=build/AppDir
 mv $A/zilli $A/AppRun
 cp assets/zilli.png $A/zilli.png
 printf '[Desktop Entry]\nType=Application\nName=Zilli\nComment=Okul zil programı\nIcon=zilli\nExec=zilli\nTerminal=false\nCategories=Education;\n' > $A/zilli.desktop
-TOOL=build/appimagetool-x86_64.AppImage
-[ -x $TOOL ] || { curl -sSL -o $TOOL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage; chmod +x $TOOL; }
+TOOL=build/appimagetool-1.9.1-x86_64.AppImage
+[ -f $TOOL ] || curl -fsSL -o $TOOL "$TOOL_URL"
+echo "$TOOL_SHA  $TOOL" | sha256sum -c --quiet
+chmod +x $TOOL
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 $TOOL -n "$PWD/$A" "$PWD/dist/Zilli-x86_64.AppImage" >/dev/null
 ls -la dist/

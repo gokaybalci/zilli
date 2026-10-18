@@ -73,8 +73,6 @@ DEFAULT_CONFIG = {
     },
     "music": {"on": False, "volume": 60},
     "march_volume": 100,
-    "marches": {"istiklalmarsi.mp3": "İstiklal Marşı", "saygidurusu.mp3": "Saygı Duruşu + İstiklal Marşı",
-                "siren.mp3": "Siren"},
     "days": {
         "haftaici": {"on": True, "lessons": [
             ["08:30", "09:10"], ["09:20", "10:00"], ["10:10", "10:50"], ["11:00", "11:40"],
@@ -85,7 +83,7 @@ DEFAULT_CONFIG = {
     "autostart_asked": False,
     "sounds_version": 0,
 }
-SOUNDS_VERSION = 2  # programla gelen ses seti değişince artır: eksik dosyalar veri klasörüne bir kez kopyalanır
+SOUNDS_VERSION = 3  # programla gelen ses seti değişince artır: eksik dosyalar veri klasörüne bir kez kopyalanır
 
 
 # ---------- saf fonksiyonlar (test_zilli.py bunları sınar) ----------
@@ -124,6 +122,19 @@ def validate_lessons(rows):
         prev_end = e
         out.append([fmt_hhmm(s), fmt_hhmm(e)])
     return out
+
+
+def break_error(lessons, offset):
+    """Öğrenci zili teneffüs bitmeden çalmasın: her teneffüs bu süreden uzun olmalı (eşitse iki zil aynı
+    saniyeye düşer, biri çalmaz). Sorun yoksa boş metin."""
+    def dur(sec):
+        return "%d dk" % (sec // 60) if sec % 60 == 0 else "%d sn" % sec
+    for i in range(1, len(lessons) if offset else 0):
+        gap = parse_hhmm(lessons[i][0]) - parse_hhmm(lessons[i - 1][1])
+        if gap <= offset:
+            return ("%d. dersten önceki teneffüs %s; öğrenci zili dersten %s önce çaldığı için teneffüs bundan "
+                    "uzun olmalı." % (i + 1, dur(gap), dur(offset)))
+    return ""
 
 
 def events_for(cfg, date):
@@ -261,35 +272,15 @@ def ensure_data(cfg):
     cfg["sounds_version"] = SOUNDS_VERSION
 
 
-# Supper Zill'den kalan numaralı dosya adları → okunur adlar
 MARCH_CHAINS = {"saygidurusu.mp3": ["istiklalmarsi.mp3"]}  # saygı duruşunun ardından marş hemen çalar
-RENAMES = {"Marşlar": {"0.mp3": "istiklalmarsi.mp3", "1.mp3": "saygidurusu.mp3", "2.mp3": "siren.mp3"}}
+# ayarlara yazılmaz: yeni sürümdeki ad düzeltmesi herkese ulaşsın
+MARCH_LABELS = {"istiklalmarsi.mp3": "İstiklal Marşı", "istiklalmarsiorkestra.mp3": "İstiklal Marşı (Enstrümental)",
+                "saygidurusu.mp3": "Saygı Duruşu + İstiklal Marşı", "siren.mp3": "Siren"}
 
 
-OLD_DEFAULT_MELODIES = {"ogretmen": "Melodi 5.wav", "ogrenci": "Melodi 6.wav", "cikis": "Melodi 1.wav"}
-
-
-def migrate_names(cfg, data):
-    """Eski adlı dosyaları yeniden adlandırır, ayarlardaki adları günceller. Yeni adlısı zaten varsa eski
-    dosya silinmez, düğme listesinde görünmesin diye Eski/ alt klasörüne taşınır."""
-    for folder, names in RENAMES.items():
-        for old, new in names.items():
-            o, n = os.path.join(data, folder, old), os.path.join(data, folder, new)
-            if not os.path.exists(o):
-                continue
-            if os.path.exists(n):
-                os.makedirs(os.path.join(data, folder, "Eski"), exist_ok=True)
-                n = os.path.join(data, folder, "Eski", old)
-            os.replace(o, n)
-    cfg.pop("anons_on", None)  # anons özelliği kaldırıldı
-    for b in cfg["bells"].values():
-        b.pop("anons", None)
-    # eski varsayılan melodiler hiç değiştirilmemişse MEB zillerine geç
-    if all(cfg["bells"][k]["melody"] == v for k, v in OLD_DEFAULT_MELODIES.items()):
-        for k in OLD_DEFAULT_MELODIES:
-            new = DEFAULT_CONFIG["bells"][k]["melody"]
-            if os.path.exists(os.path.join(data, "Melodiler", new)):
-                cfg["bells"][k]["melody"] = new
+def march_label(name):
+    """Marş düğmesinin yazısı: bilinen dosyaların adı, diğerlerinde uzantısız dosya adı."""
+    return MARCH_LABELS.get(name, os.path.splitext(name)[0])
 
 
 def check_config(cfg):
@@ -299,7 +290,7 @@ def check_config(cfg):
         day["on"] = bool(day["on"])
         day["lessons"] = validate_lessons([(str(s), str(e)) for s, e in day["lessons"]])
     cfg["teacher_offset"] = max(0, int(cfg["teacher_offset"]))
-    for key in ("ogrenci", "ogretmen", "cikis", "son"):
+    for key in BELL_NAMES:
         b = cfg["bells"][key]
         b["melody"], b["volume"] = str(b["melody"]), max(0, min(100, int(b["volume"])))
     cfg["music"]["volume"] = max(0, min(100, int(cfg["music"]["volume"])))
@@ -451,7 +442,7 @@ class SniTray:
         return True
 
     def serve(self):
-        from jeepney import HeaderFields, MessageType, new_error, new_method_return
+        from jeepney import MessageType
         while True:
             try:
                 msg = self.conn.receive()
@@ -459,27 +450,34 @@ class SniTray:
                 return
             if msg.header.message_type != MessageType.method_call:
                 continue
-            member = msg.header.fields.get(HeaderFields.member)
-            if member in ("Activate", "SecondaryActivate"):
-                self.send("show")
-                reply = new_method_return(msg)
-            elif member == "ContextMenu":
-                self.send(("menu",) + tuple(msg.body))
-                reply = new_method_return(msg)
-            elif member == "Scroll":
-                reply = new_method_return(msg)
-            elif member == "GetAll":
-                reply = new_method_return(msg, "a{sv}", (self.props,))
-            elif member == "Get" and msg.body[1] in self.props:
-                reply = new_method_return(msg, "v", (self.props[msg.body[1]],))
-            elif member == "Introspect":
-                reply = new_method_return(msg, "s", (SNI_INTROSPECT,))
-            else:
-                reply = new_error(msg, "org.freedesktop.DBus.Error.UnknownMethod")
             try:
-                self.conn.send(reply)
+                self.conn.send(self.handle(msg))
             except Exception:
                 return
+
+    def handle(self, msg):
+        """Gelen çağrının yanıtı. Bozuk çağrı hata yanıtı alır; iş parçacığı ölüp tepsi tıklanmaz hale gelmez."""
+        from jeepney import HeaderFields, new_error, new_method_return
+        member = msg.header.fields.get(HeaderFields.member)
+        try:
+            if member in ("Activate", "SecondaryActivate"):
+                self.send("show")
+                return new_method_return(msg)
+            if member == "ContextMenu":
+                x, y = msg.body
+                self.send(("menu", x, y))
+                return new_method_return(msg)
+            if member == "Scroll":
+                return new_method_return(msg)
+            if member == "GetAll":
+                return new_method_return(msg, "a{sv}", (self.props,))
+            if member == "Get" and msg.body[1] in self.props:
+                return new_method_return(msg, "v", (self.props[msg.body[1]],))
+            if member == "Introspect":
+                return new_method_return(msg, "s", (SNI_INTROSPECT,))
+            return new_error(msg, "org.freedesktop.DBus.Error.UnknownMethod")
+        except Exception:
+            return new_error(msg, "org.freedesktop.DBus.Error.InvalidArgs")
 
     def stop(self):
         try:
@@ -866,7 +864,16 @@ class App:
         off.set(dict(OFFSETS).get(self.cfg["teacher_offset"], OFFSETS[0][1]))
         off.pack(side="right")
         ttk.Label(top, text="Öğrenci zili:").pack(side="right", padx=(12, 6))
-        off.bind("<<ComboboxSelected>>", lambda _: self.set_cfg("teacher_offset", OFFSETS[off.current()][0]))
+        def off_changed(_):
+            new = OFFSETS[off.current()][0]
+            for key, name in DAYS:  # kapalı günler de: sonradan açılınca yanlış sırada çalmasın
+                err = break_error(self.cfg["days"][key]["lessons"], new)
+                if err:
+                    off.set(dict(OFFSETS).get(self.cfg["teacher_offset"], OFFSETS[0][1]))  # eski değere dön
+                    messagebox.showerror(APP, "%s: %s" % (name, err))
+                    return
+            self.set_cfg("teacher_offset", new)
+        off.bind("<<ComboboxSelected>>", off_changed)
         holder = ttk.Frame(p)
         holder.pack(fill="both", expand=True, pady=(10, 0))
         self.day_frames = {}
@@ -883,8 +890,12 @@ class App:
         day = self.cfg["days"][key]
         f = self.card(holder, name + " ders saatleri (SS:DD, boş satırlar atlanır)")
         on = tk.BooleanVar(value=day["on"])
-        ttk.Checkbutton(f, text=DAY_TOGGLE[key], variable=on,
-                        bootstyle="success-round-toggle").grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 4))
+
+        def toggled():  # diğer anahtarlar gibi hemen kaydet; Kaydet'e basmayı unutan da etkilenmesin
+            self.cfg["days"][key]["on"] = on.get()
+            self.save()
+        ttk.Checkbutton(f, text=DAY_TOGGLE[key], variable=on, bootstyle="success-round-toggle",
+                        command=toggled).grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 4))
         rows = []
         for c in (0, 4):
             ttk.Label(f, text="Giriş", bootstyle="secondary").grid(row=1, column=c + 1)
@@ -903,6 +914,10 @@ class App:
                 lessons = validate_lessons([(s.get(), e.get()) for s, e in rows])
             except ValueError as ex:
                 messagebox.showerror(APP, str(ex))
+                return
+            err = break_error(lessons, self.cfg["teacher_offset"])
+            if err:
+                messagebox.showerror(APP, err)
                 return
             self.cfg["days"][key] = {"on": on.get(), "lessons": lessons}
             self.save()
@@ -998,7 +1013,7 @@ class App:
         grid.pack(fill="x")
         grid.columnconfigure((0, 1), weight=1, uniform="m")
         for i, name in enumerate(audio_files(MARS)):
-            label = self.cfg["marches"].get(name, os.path.splitext(name)[0])
+            label = march_label(name)
             style = "danger" if "siren" in label.lower() else "primary"
             ttk.Button(grid, text="▶  " + label, bootstyle=style, padding=(10, 10),
                        command=lambda n=name, l=label: self.play_march(n, l)).grid(row=i // 2, column=i % 2, padx=3, pady=3, sticky="ew")
@@ -1215,12 +1230,26 @@ class App:
         self.root.destroy()
 
 
-def main():
+def bind_lock(port=SINGLE_PORT):
+    """Tek kopya kilidi (iki kopya zilleri iki kez çalmasın): dinleyen soket, başka kopya çalışıyorsa None."""
     lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if os.name != "nt":
+        # Linux kapanan bağlantının portunu ~60 sn TIME_WAIT'te tutar; hemen yeniden açılış "zaten çalışıyor"
+        # sanılmasın. Dinleyen bir kopya varsa bind yine başarısız olur. Windows'ta bu seçenek çalışan
+        # dinleyicinin portunu ele geçirmeye izin verir, orada kullanılmaz.
+        lock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        lock.bind(("127.0.0.1", SINGLE_PORT))  # aynı anda iki kopya zilleri iki kez çalmasın
+        lock.bind(("127.0.0.1", port))
         lock.listen(2)
+        return lock
     except OSError:
+        lock.close()
+        return None
+
+
+def main():
+    lock = bind_lock()
+    if lock is None:
         try:  # zaten çalışıyor: açık pencereyi öne getir
             socket.create_connection(("127.0.0.1", SINGLE_PORT), timeout=2).sendall(b"show")
         except OSError:
@@ -1231,7 +1260,6 @@ def main():
     cfg, err = load_config()
     try:
         ensure_data(cfg)
-        migrate_names(cfg, DATA)
         save_config(cfg)
     except OSError:
         pass

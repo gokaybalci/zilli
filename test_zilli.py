@@ -44,28 +44,7 @@ assert current_period(lessons, 31000) == ("1. ders", 30600, 33000)
 assert current_period(lessons, 33100) == ("Teneffüs", 33000, 33600)
 assert current_period(lessons, 36000) == ("Okul bitti", None, None)
 assert current_period([], 36000)[0] == "Bugün ders yok"
-# eski dosya adları okunur adlara taşınır, ayarlar güncellenir
 import copy, os, tempfile
-from zilli import migrate_names
-with tempfile.TemporaryDirectory() as d:
-    for f, data in (("Marşlar/0.mp3", b"a"), ("Marşlar/1.mp3", b"b"), ("Marşlar/saygidurusu.mp3", b"farkli"),
-                    ("Melodiler/MEB Öğrenci Zili.mp3", b"m"), ("Melodiler/MEB Çıkış Zili.mp3", b"m"),
-                    ("Melodiler/MEB Teneffüs Zili.mp3", b"m")):
-        os.makedirs(os.path.join(d, os.path.dirname(f)), exist_ok=True)
-        open(os.path.join(d, f), "wb").write(data)
-    c = copy.deepcopy(DEFAULT_CONFIG)
-    c["anons_on"] = True  # eski sürümden kalan anons ayarları temizlenir
-    for k, v in (("ogretmen", "Melodi 5.wav"), ("ogrenci", "Melodi 6.wav"), ("cikis", "Melodi 1.wav")):
-        c["bells"][k].update(melody=v, anons="1.mp3")  # eski sürümün varsayılanları
-    migrate_names(c, d)
-    assert sorted(os.listdir(os.path.join(d, "Marşlar"))) == ["Eski", "istiklalmarsi.mp3", "saygidurusu.mp3"]
-    assert os.listdir(os.path.join(d, "Marşlar", "Eski")) == ["1.mp3"]  # yenisi varsa silinmez, kenara alınır
-    assert "anons_on" not in c and all("anons" not in b for b in c["bells"].values())
-    assert [c["bells"][k]["melody"] for k in ("ogrenci", "ogretmen", "cikis")] == [
-        "MEB Öğrenci Zili.mp3", "MEB Çıkış Zili.mp3", "MEB Teneffüs Zili.mp3"]
-    c["bells"]["cikis"]["melody"] = "Melodi 3.wav"  # kullanıcı seçimi korunur
-    migrate_names(c, d)
-    assert c["bells"]["cikis"]["melody"] == "Melodi 3.wav"
 
 # ses süresi başlıktan okunur (ilerleme çubuğu); örnek dosyalar burada üretilir, sounds/ kullanıcıya ait
 from zilli import audio_duration, mmss
@@ -112,4 +91,81 @@ with tempfile.TemporaryDirectory() as d:
     assert missing_error([(ok, 100)]) == ""
     assert missing_error([(ok, 100), (os.path.join(d, "yok.mp3"), 100), (d + os.sep, 100)]) == \
         "Ses dosyası yok: yok.mp3, (seçilmedi)"
+# tek kopya kilidi: çalışan kopya ikinciyi engeller; "show" bağlantısından hemen sonra yeniden açılış engellenmez
+import socket, threading
+from zilli import bind_lock
+port = 47391  # gerçek Zilli'nin portuyla (47392) çakışmasın
+first = bind_lock(port)
+assert first is not None and bind_lock(port) is None  # ikinci kopya açılamaz
+
+def answer():  # App.listen gibi: oku ve önce sunucu kapatsın (Linux'ta port TIME_WAIT'e düşer)
+    conn, _ = first.accept()
+    conn.recv(16)
+    conn.close()
+t = threading.Thread(target=answer)
+t.start()
+socket.create_connection(("127.0.0.1", port), timeout=2).sendall(b"show")
+t.join(5)
+first.close()  # Zilli kapandı
+again = bind_lock(port)
+assert again is not None, "yeniden açılış 'zaten çalışıyor' sanıldı"
+again.close()
+# öğrenci zili teneffüs bitmeden çalmasın: teneffüs, öğrenci zili süresinden uzun olmalı
+from zilli import break_error
+two = [["08:30", "09:10"], ["09:12", "09:52"]]  # 2 dk teneffüs
+assert break_error(two, 60) == "" and break_error(two, 0) == "" and break_error(two[:1], 180) == ""
+assert break_error(two, 180).startswith("2. dersten önceki teneffüs 2 dk; öğrenci zili dersten 3 dk önce")
+assert break_error(two, 120) != ""  # eşitse iki zil aynı saniyeye düşer
+assert "45 sn" in break_error([["08:30", "09:10"], ["09:10", "09:50"]], 45)
+assert break_error(DEFAULT_CONFIG["days"]["haftaici"]["lessons"], 180) == ""  # varsayılan saatler her seçenekle geçerli
+# bozuk ayar dosyası silinmez, .bozuk olarak kenara alınır ve varsayılanlarla açılır
+import json, zilli
+with tempfile.TemporaryDirectory() as d:
+    zilli.CONFIG_PATH = path = os.path.join(d, "zilli.json")
+    cfg, err = zilli.load_config()  # dosya yok: varsayılanlar, uyarı yok
+    assert cfg == DEFAULT_CONFIG and cfg is not DEFAULT_CONFIG and err is None
+    for broken in ('{"days": {"haftaici": {"on": true', json.dumps({"days": {"haftaici": {"lessons": [["25:99", "26:00"]]}}})):
+        open(path, "w", encoding="utf-8").write(broken)
+        cfg, err = zilli.load_config()
+        assert err and "zilli.json.bozuk" in err, err
+        assert not os.path.exists(path) and open(path + ".bozuk", encoding="utf-8").read() == broken  # içerik korunur
+        assert cfg == DEFAULT_CONFIG
+        cfg["days"]["haftaici"]["lessons"].clear()  # dönen kopya değiştirilince varsayılanlar bozulmasın
+        assert DEFAULT_CONFIG["days"]["haftaici"]["lessons"]
+    good = {"bells_on": False, "days": {"pazar": {"on": True, "lessons": [["10:00", "10:40"]]}}}
+    open(path, "w", encoding="utf-8").write(json.dumps(good))
+    os.remove(path + ".bozuk")
+    cfg, err = zilli.load_config()  # sağlam dosya olduğu gibi okunur, kenara alınmaz
+    assert err is None and not os.path.exists(path + ".bozuk")
+    assert cfg["bells_on"] is False and cfg["days"]["pazar"] == {"on": True, "lessons": [["10:00", "10:40"]]}
+    assert cfg["days"]["haftaici"] == DEFAULT_CONFIG["days"]["haftaici"]  # eksik alanlar varsayılandan
+# Linux tepsisi: bozuk D-Bus çağrısı hata yanıtı alır, iş parçacığını öldürmez (jeepney yalnız Linux'ta)
+try:
+    import jeepney
+except ImportError:
+    jeepney = None
+if jeepney:
+    from jeepney import DBusAddress, MessageType, new_method_call
+    sent = []
+    tray = zilli.SniTray(sent.append, os.path.join(zilli.ASSETS, "zilli.png"))
+    item = DBusAddress("/StatusNotifierItem", bus_name="org.kde.StatusNotifierItem-1-1")
+    props = item.with_interface("org.freedesktop.DBus.Properties")
+    sni = item.with_interface("org.kde.StatusNotifierItem")
+    bad_get = tray.handle(new_method_call(props, "Get", "s", ("Title",)))  # özellik adı eksik
+    assert bad_get.header.message_type == MessageType.error
+    bad_menu = tray.handle(new_method_call(sni, "ContextMenu", "i", (5,)))  # y eksik
+    assert bad_menu.header.message_type == MessageType.error and sent == []
+    title = tray.handle(new_method_call(props, "Get", "ss", ("org.kde.StatusNotifierItem", "Title")))
+    assert title.header.message_type == MessageType.method_return and title.body == (("s", "Zilli"),)
+    tray.handle(new_method_call(sni, "ContextMenu", "ii", (10, 20)))
+    assert sent == [("menu", 10, 20)]
+# marş düğmesi yazıları ayarlardan değil sabitten gelir (eski zilli.json'daki "marches" etkilemez)
+from zilli import march_label
+assert "marches" not in DEFAULT_CONFIG
+assert march_label("saygidurusu.mp3") == "Saygı Duruşu + İstiklal Marşı" and march_label("Okul Marşı.mp3") == "Okul Marşı"
+assert march_label("istiklalmarsiorkestra.mp3") == "İstiklal Marşı (Enstrümental)"
+# düğmeler klasör sırasıyla 2 sütun: enstrümental, İstiklal Marşı'nın hemen yanında
+assert sorted(["siren.mp3", "saygidurusu.mp3", "istiklalmarsiorkestra.mp3", "istiklalmarsi.mp3"], key=str.lower)[:2] == \
+    ["istiklalmarsi.mp3", "istiklalmarsiorkestra.mp3"]
+assert sorted(zilli.BELL_NAMES) == sorted(DEFAULT_CONFIG["bells"])  # check_config her zili BELL_NAMES'ten denetler
 print("test_zilli OK")
