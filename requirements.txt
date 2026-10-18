@@ -1,0 +1,5 @@
+ttkbootstrap==1.12.2
+pillow==9.5.0
+pygame==2.6.1
+pystray==0.19.5
+jeepney==0.8.0; sys_platform == "linux"

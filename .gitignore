@@ -1,0 +1,12 @@
+# derleme çıktıları ve önbellekler
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Windows'ta kaynaktan çalıştırınca proje klasörüne yazılan veriler
+/zilli.json
+/zilli.json.*
+/Melodiler/
+/Marşlar/
+/Müzik/
