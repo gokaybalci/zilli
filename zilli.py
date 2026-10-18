@@ -36,7 +36,7 @@ from ttkbootstrap.style import Colors  # noqa: E402
 from ttkbootstrap.dialogs import MessageDialog  # noqa: E402
 from ttkbootstrap.icons import Icon  # noqa: E402
 
-APP, VERSION = "Zilli", "1.0.0"
+APP, VERSION = "Zilli", "1.0.1"
 BASE = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
 # Windows'ta program kullanıcı klasörüne kurulur (yazılabilir); Linux'ta AppImage/deb salt okunur, veriler ~/Zilli'de.
