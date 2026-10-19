@@ -168,4 +168,18 @@ assert march_label("istiklalmarsiorkestra.mp3") == "İstiklal Marşı (Enstrüme
 assert sorted(["siren.mp3", "saygidurusu.mp3", "istiklalmarsiorkestra.mp3", "istiklalmarsi.mp3"], key=str.lower)[:2] == \
     ["istiklalmarsi.mp3", "istiklalmarsiorkestra.mp3"]
 assert sorted(zilli.BELL_NAMES) == sorted(DEFAULT_CONFIG["bells"])  # check_config her zili BELL_NAMES'ten denetler
+# arayüz yardımcıları: panodaki büyük satır, gün çizelgesi aralığı, geri sayım
+from zilli import now_text, timeline_span, countdown_text, THEME_COLORS, THEME_EXTRA, THEMES
+assert now_text(True, lessons, 31000) == "1. ders, 34 dakika kaldı"   # 08:36:40, ders 09:10'da biter
+assert now_text(True, lessons, 33100) == "Teneffüs, 9 dakika kaldı"
+assert now_text(True, lessons, 30000) == "Okul başlamadı" and now_text(False, lessons, 31000) == "Bugün zil yok"
+assert timeline_span(ev) == (ev[0][0] - 600, ev[-1][0] + 600) and timeline_span([]) is None
+assert countdown_text(5) == "0:05" and countdown_text(24 * 60 + 4) == "24:04" and countdown_text(3725) == "1:02:05"
+# her temada aynı renk rolleri; eski Bootstrap tema adı Açık'a döner
+roles = set(THEME_COLORS["acik"][1])
+assert all(set(c) == roles for _, c in THEME_COLORS.values()) and len(roles) == 16
+assert set(THEME_EXTRA) == set(THEME_COLORS) == {k for k, _ in THEMES}
+assert all(set(x) == set(THEME_EXTRA["acik"]) for x in THEME_EXTRA.values())
+assert check_config(merge(copy.deepcopy(DEFAULT_CONFIG), {"theme": "flatly"}))["theme"] == "acik"
+assert check_config(merge(copy.deepcopy(DEFAULT_CONFIG), {"theme": "gece"}))["theme"] == "gece"
 print("test_zilli OK")

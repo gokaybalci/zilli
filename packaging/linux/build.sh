@@ -36,7 +36,8 @@ $P/bin/python3 -m pip install -q --no-warn-script-location --disable-pip-version
 
 # Tcl/Tk ve Xft paketin içine: hedef sistemde tk kurulu olmasa da çalışsın
 L=/usr/lib/x86_64-linux-gnu
-cp -L $L/libtcl8.6.so $L/libtk8.6.so $L/libXft.so.2 $L/libXss.so.1 $P/lib/
+# libffi: ctypes (yazı tipi yükleme) için; yeni dağıtımlarda yalnız libffi.so.7/8 bulunur
+cp -L $L/libtcl8.6.so $L/libtk8.6.so $L/libXft.so.2 $L/libXss.so.1 $L/libffi.so.6 $P/lib/
 cp -r /usr/share/tcltk/tcl8.6 /usr/share/tcltk/tk8.6 $P/lib/
 # kitaplıklar birbirini kendi klasörlerinde bulsun (LD_LIBRARY_PATH alt süreçlere sızmasın diye kullanılmaz)
 patchelf --set-rpath "\$ORIGIN/../lib" $P/bin/python3.8

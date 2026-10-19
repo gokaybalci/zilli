@@ -32,11 +32,11 @@ from tkinter import filedialog, font as tkfont, messagebox  # noqa: E402
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 import ttkbootstrap as ttk  # noqa: E402
-from ttkbootstrap.style import Colors  # noqa: E402
+from ttkbootstrap.style import Colors, ThemeDefinition  # noqa: E402
 from ttkbootstrap.dialogs import MessageDialog  # noqa: E402
 from ttkbootstrap.icons import Icon  # noqa: E402
 
-APP, VERSION = "Zilli", "1.0.1"
+APP, VERSION = "Zilli", "1.1.0"
 BASE = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
 # Windows'ta program kullanıcı klasörüne kurulur (yazılabilir); Linux'ta AppImage/deb salt okunur, veriler ~/Zilli'de.
@@ -45,12 +45,12 @@ CONFIG_PATH = os.path.join(DATA, "zilli.json")
 FOLDERS = ("Melodiler", "Marşlar", "Müzik")
 MELODI, MARS, MUZIK = (os.path.join(DATA, d) for d in FOLDERS)
 AUDIO_EXT = (".mp3", ".wav", ".ogg", ".flac", ".mid", ".midi")
-DAYS = [("haftaici", "Hafta İçi"), ("cumartesi", "Cumartesi"), ("pazar", "Pazar")]
+DAYS = [("haftaici", "Hafta içi"), ("cumartesi", "Cumartesi"), ("pazar", "Pazar")]
 DAY_TOGGLE = {"haftaici": "Hafta içi zil çalsın", "cumartesi": "Cumartesileri zil çalsın",
               "pazar": "Pazarları zil çalsın"}
 # sıra: öğrenci zili (dersten önce), öğretmen zili (ders başı), teneffüs zili (ders sonu; ayar anahtarı "cikis")
-BELLS = [("ogrenci", "Öğrenci Zili"), ("ogretmen", "Öğretmen Zili"), ("cikis", "Teneffüs Zili")]
-BELL_NAMES = dict(BELLS + [("son", "Son Zil")])
+BELLS = [("ogrenci", "Öğrenci zili"), ("ogretmen", "Öğretmen zili"), ("cikis", "Teneffüs zili")]
+BELL_NAMES = dict(BELLS + [("son", "Son zil")])
 OFFSETS = [(0, "Çalmasın"), (15, "15 saniye önce"), (30, "30 saniye önce"), (45, "45 saniye önce"),
            (60, "1 dakika önce"), (120, "2 dakika önce"), (180, "3 dakika önce")]
 GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
@@ -62,7 +62,7 @@ LATE_LIMIT = 60  # bilgisayar uykudan uyanırsa bundan eski zilleri çalma
 SINGLE_PORT = 47392
 
 DEFAULT_CONFIG = {
-    "theme": "flatly",
+    "theme": "acik",
     "bells_on": True,
     "teacher_offset": 60,
     "bells": {
@@ -295,6 +295,8 @@ def check_config(cfg):
         b["melody"], b["volume"] = str(b["melody"]), max(0, min(100, int(b["volume"])))
     cfg["music"]["volume"] = max(0, min(100, int(cfg["music"]["volume"])))
     cfg["march_volume"] = max(0, min(100, int(cfg["march_volume"])))
+    if cfg["theme"] not in THEME_COLORS:  # 1.0.x'in Bootstrap temaları (flatly, darkly...) artık yok
+        cfg["theme"] = "acik"
     return cfg
 
 
@@ -541,6 +543,87 @@ class Player:
 
 # ---------- arayüz ----------
 
+FONT_FILES = ("AtkinsonHyperlegibleNext-Regular.ttf", "AtkinsonHyperlegibleNext-Bold.ttf")
+FONT_FAMILY = "Atkinson Hyperlegible Next"
+
+# "Okul tahtası ve pirinç zil": tahta yeşili yapı, pirinç tek vurgu. Her çift WCAG oranlarıyla ölçüldü.
+THEMES = [("acik", "Açık"), ("gece", "Gece"), ("kontrast", "Yüksek kontrast")]
+THEME_COLORS = {
+    "acik": ("light", dict(
+        primary="#2E5A4C", secondary="#56635E", success="#2E5A4C", info="#C9971C", warning="#7A5800",
+        danger="#B83227", light="#ECEFEC", dark="#56635E", bg="#F7F8F6", fg="#1E2B26", selectbg="#7A5800",
+        selectfg="#F2F5F2", border="#C8CFCB", inputfg="#1E2B26", inputbg="#FFFFFF", active="#E3E7E4")),
+    "gece": ("dark", dict(
+        primary="#2F7A62", secondary="#A3B3AC", success="#6FB89C", info="#E0B54A", warning="#E8C468",
+        danger="#C8382D", light="#1B332C", dark="#A3B3AC", bg="#13241F", fg="#ECF1EC", selectbg="#5E4A12",
+        selectfg="#ECF1EC", border="#2E4C42", inputfg="#ECF1EC", inputbg="#1A302A", active="#24413A")),
+    "kontrast": ("light", dict(
+        primary="#003D2E", secondary="#2B2B2B", success="#003D2E", info="#E0A800", warning="#5A4100",
+        danger="#A30000", light="#EDEDED", dark="#2B2B2B", bg="#FFFFFF", fg="#000000", selectbg="#5A4100",
+        selectfg="#FFFFFF", border="#000000", inputfg="#000000", inputbg="#FFFFFF", active="#E6E6E6")),
+}
+# ttkbootstrap paletinde olmayan roller: pirinç yazı/çizgi, seçili menü yazısı, ders bloğu ve üstündeki yazı
+THEME_EXTRA = {
+    "acik": dict(brass_text="#7A5800", brass_line="#8C6400", nav_text="#F2F5F2", nav_sel_text="#1E2B26",
+                 block="#2E5A4C", block_text="#F2F5F2"),
+    "gece": dict(brass_text="#E8C468", brass_line="#E0B54A", nav_text="#ECF1EC", nav_sel_text="#13241F",
+                 block="#529E84", block_text="#13241F"),
+    "kontrast": dict(brass_text="#5A4100", brass_line="#7A5800", nav_text="#FFFFFF", nav_sel_text="#000000",
+                     block="#003D2E", block_text="#FFFFFF"),
+}
+
+
+def load_fonts():
+    """Programla gelen yazı tipini yalnız bu süreç için yükler (kurulum, yönetici izni gerekmez).
+    Yüklenemezse sistem yazı tipine düşülür (pick_font)."""
+    folder = os.path.join(ASSETS, "fonts")
+    try:
+        if os.name == "nt":
+            import ctypes
+            for f in FONT_FILES:
+                ctypes.windll.gdi32.AddFontResourceExW(os.path.join(folder, f), 0x10, 0)  # FR_PRIVATE
+        else:
+            import ctypes
+            ctypes.CDLL("libfontconfig.so.1").FcConfigAppFontAddDir(None, os.fsencode(folder))
+    except (ImportError, OSError, AttributeError):  # ctypes/fontconfig yoksa da açılış durmasın
+        pass
+
+
+def pick_font():
+    have = set(tkfont.families())
+    for f in (FONT_FAMILY, "Segoe UI", "Ubuntu", "Noto Sans", "Cantarell", "DejaVu Sans"):
+        if f in have:
+            return f
+    return "Helvetica"
+
+
+def register_themes(style):
+    for name, (kind, colors) in THEME_COLORS.items():
+        style.register_theme(ThemeDefinition(name, colors, kind))
+
+
+def now_text(day_on, lessons, sec):
+    """Panodaki büyük satır: "2. ders, 25 dakika kaldı" gibi."""
+    if not day_on:
+        return "Bugün zil yok"
+    label, s, e = current_period(lessons, sec)
+    if s is None:
+        return label
+    return "%s, %d dakika kaldı" % (label, (e - sec + 59) // 60)
+
+
+def timeline_span(events):
+    """Gün çizelgesinin kapsadığı aralık (saniye): ilk zilden 10 dk önce, son zilden 10 dk sonra."""
+    if not events:
+        return None
+    return events[0][0] - 600, events[-1][0] + 600
+
+
+def countdown_text(left):
+    return "%d:%02d:%02d" % (left // 3600, left % 3600 // 60, left % 60) if left >= 3600 else \
+        "%d:%02d" % (left // 60, left % 60)
+
+
 class Bubble:
     """Üzerine gelince yanında çıkan küçük balon (ttkbootstrap ToolTip Python 3.7'de açılmıyor)."""
 
@@ -556,7 +639,7 @@ class Bubble:
         self.tip.overrideredirect(True)
         self.tip.geometry("+%d+%d" % (self.widget.winfo_rootx() + self.widget.winfo_width() + 10,
                                       self.widget.winfo_rooty() - 4))
-        ttk.Label(self.tip, text=self.text, bootstyle="inverse-success", padding=(10, 4)).pack()
+        ttk.Label(self.tip, text=self.text, bootstyle="inverse-primary", padding=(10, 4)).pack()
 
     def hide(self, _=None):
         if self.tip:
@@ -564,12 +647,45 @@ class Bubble:
             self.tip = None
 
 
-def pick_font():
-    have = set(tkfont.families())
-    for f in ("Segoe UI", "Ubuntu", "Noto Sans", "Cantarell", "DejaVu Sans"):
-        if f in have:
-            return f
-    return "Helvetica"
+class Digits(tk.Canvas):
+    """Rakamları eşit hücrelere çizen saat yazısı: yazı tipinin rakam genişlikleri farklı olsa da saniye
+    değişince yazı titremez. İkinci (küçük) kısım aynı taban çizgisine oturur."""
+
+    def __init__(self, parent, family, size, small=0):
+        tk.Canvas.__init__(self, parent, highlightthickness=0, bd=0, autostyle=False)
+        self.family, self.small_size = family, small
+        self.text, self.tail, self.fg, self.tail_fg = "", "", "#000", "#000"
+        self.resize(size)
+
+    def resize(self, size):
+        self.big = tkfont.Font(family=self.family, size=size, weight="bold")
+        self.sm = tkfont.Font(family=self.family, size=self.small_size or size, weight="bold")
+        self.cell = max(self.big.measure(d) for d in "0123456789")
+        self.draw()
+
+    def colors(self, bg, fg, tail_fg):
+        self.fg, self.tail_fg = fg, tail_fg
+        self.configure(bg=bg)
+        self.draw()
+
+    def set(self, text, tail=""):
+        if (text, tail) != (self.text, self.tail):
+            self.text, self.tail = text, tail
+            self.draw()
+
+    def draw(self):
+        self.delete("all")
+        h = self.big.metrics("linespace")
+        bottom = h - (self.big.metrics("descent") - self.sm.metrics("descent"))
+        x = 0
+        for ch in self.text:
+            w = self.cell if ch.isdigit() else self.big.measure(ch)
+            self.create_text(x + w / 2.0, h, text=ch, font=self.big, fill=self.fg, anchor="s")
+            x += w
+        if self.tail:
+            self.create_text(x, bottom, text=self.tail, font=self.sm, fill=self.tail_fg, anchor="sw")
+            x += self.sm.measure(self.tail)
+        self.configure(width=max(1, x), height=h)
 
 
 class App:
@@ -584,7 +700,8 @@ class App:
         self.last_error = ""
         self.F = pick_font()
         for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
-            tkfont.nametofont(name).configure(family=self.F, size=10)
+            tkfont.nametofont(name).configure(family=self.F, size=11)
+        self.extra = THEME_EXTRA[root.style.theme_use()]
 
         root.title(APP)
         root.geometry("960x680")
@@ -597,40 +714,40 @@ class App:
         except tk.TclError:
             self.logo = ""
 
-        side = ttk.Frame(root, bootstyle="primary", padding=(0, 18))
+        side = ttk.Frame(root, bootstyle="primary", padding=(0, 20))
         side.pack(side="left", fill="y")
         self.side_title = ttk.Label(side, text=" Zilli", image=self.logo, compound="left", font=(self.F, 24, "bold"),
                                     bootstyle="inverse-primary")
         self.side_title.pack(padx=14)
-        self.side_sub = ttk.Label(side, text="Okul Zil Sistemi", bootstyle="inverse-primary")
-        self.side_sub.pack(padx=14, pady=(0, 22))
+        self.side_sub = ttk.Label(side, text="Okul zil sistemi", bootstyle="inverse-primary")
+        self.side_sub.pack(padx=14, pady=(2, 24))
         self.page_var = tk.StringVar(value="pano")
         self.pages, self.nav, self.nav_titles = {}, [], []
-        main = self.main = ttk.Frame(root, padding=(22, 16))
+        main = self.main = ttk.Frame(root, padding=(24, 16))
         main.pack(side="left", fill="both", expand=True)
         self.build_header(main)
         body = ttk.Frame(main)
-        body.pack(fill="both", expand=True, pady=(14, 0))
+        body.pack(fill="both", expand=True, pady=(20, 0))
         for key, title, short, builder in (("pano", "Pano", "Pano", self.page_dashboard),
-                                           ("saat", "Zil Saatleri", "Saatler", self.page_schedule),
+                                           ("saat", "Zil saatleri", "Saatler", self.page_schedule),
                                            ("melodi", "Melodiler", "Melodi", self.page_bells),
-                                           ("muzik", "Müzik ve Marşlar", "Müzik", self.page_music),
+                                           ("muzik", "Müzik ve marşlar", "Müzik", self.page_music),
                                            ("ayar", "Ayarlar", "Ayarlar", self.page_settings)):
             page = ttk.Frame(body)
             builder(page)
             self.pages[key] = page
-            # düz tk düğmesi: renkleri temadan biz veririz (style_nav)
-            b = tk.Radiobutton(side, text="   " + title, value=key, variable=self.page_var, command=self.show_page,
+            # düz tk düğmesi: renkleri temadan biz veririz (apply_theme); seçili olan pirinç
+            b = tk.Radiobutton(side, text="  " + title, value=key, variable=self.page_var, command=self.show_page,
                                indicatoron=False, anchor="w", relief="flat", bd=0, highlightthickness=0,
-                               padx=18, pady=10, width=20, font=(self.F, 11), cursor="hand2", autostyle=False)
-            b.pack(fill="x")
+                               padx=18, pady=10, width=19, font=(self.F, 12), cursor="hand2", autostyle=False)
+            b.pack(fill="x", padx=10, pady=1)
             self.nav.append(b)
             self.nav_titles.append((title, short))
         ver = self.ver = ttk.Label(side, text="Sürüm " + VERSION, bootstyle="inverse-primary", cursor="hand2")
-        ver.pack(side="bottom", anchor="w", padx=18)
+        ver.pack(side="bottom", anchor="w", padx=20)
         Bubble(ver, "Gökay")
         root.bind("<Configure>", self.on_resize)
-        self.style_nav()
+        self.apply_theme()
         self.show_page()
         self.start_tray()
         root.bind("<Unmap>", self.on_unmap)
@@ -639,6 +756,9 @@ class App:
 
     def on_resize(self, e):
         """Dar pencerede kenar çubuğu kısa yazılara geçer, saat küçülür."""
+        if e.widget is self.timeline:
+            self.draw_timeline()
+            return
         if e.widget is not self.root:
             return
         compact = e.width < 820
@@ -646,16 +766,49 @@ class App:
             return
         self.compact = compact
         self.side_title.configure(text="" if compact else " Zilli")
-        self.side_sub.configure(text="" if compact else "Okul Zil Sistemi")
+        self.side_sub.configure(text="" if compact else "Okul zil sistemi")
         for b, (title, short) in zip(self.nav, self.nav_titles):
-            b.configure(text=(" " + short) if compact else ("   " + title), width=8 if compact else 20,
+            b.configure(text=(" " + short) if compact else ("  " + title), width=7 if compact else 19,
                         padx=10 if compact else 18)
         self.ver.configure(text=VERSION if compact else "Sürüm " + VERSION)
-        self.main.configure(padding=(12, 10) if compact else (22, 16))
-        self.clock.configure(font=(self.F, 26 if compact else 34, "bold"))
-        self.next_lbl.configure(wraplength=180 if compact else 0)
-        self.play_lbl.configure(wraplength=180 if compact else 0)
-        self.info.pack_configure(padx=10 if compact else 18)
+        self.main.configure(padding=(14, 10) if compact else (24, 16))
+        self.clock.resize(30 if compact else 40)
+        self.countdown.resize(26 if compact else 34)
+        self.play_lbl.configure(wraplength=200 if compact else 0)
+
+    # --- görünüm ---
+    def apply_theme(self):
+        """Tema değişince ttk dışındaki parçaları (menü, saat, çizelge) ve bölüm başlıklarını yeniden boya."""
+        st, c = self.root.style, self.root.style.colors
+        self.extra = x = THEME_EXTRA[st.theme_use()]
+        # çerçeveli grup kutusu yerine sade bölüm başlığı
+        for name in ("TLabelframe", "secondary.TLabelframe"):
+            st.configure(name, borderwidth=0, relief="flat", bordercolor=c.bg, lightcolor=c.bg, darkcolor=c.bg)
+        st.configure("TLabelframe", labelmargins=0)
+        st.configure("TLabelframe.Label", font=(self.F, 15, "bold"), foreground=c.fg, background=c.bg, padding=0)
+        st.configure("secondary.Link.TButton", padding=(0, 4))  # yazı düğmeleri metinle aynı hizada
+        st.configure("info.Horizontal.TProgressbar", thickness=4, troughcolor=c.border, background=c.info)
+        st.configure("Treeview.Heading", font=(self.F, 11, "bold"))
+        # salt okunur açılır kutu bazı koyu temalarda seçim rengiyle dolar; normal giriş zemini kalsın
+        st.map("TCombobox", fieldbackground=[("readonly", c.inputbg)], foreground=[("readonly", c.inputfg)],
+               selectbackground=[("readonly", c.inputbg)], selectforeground=[("readonly", c.inputfg)])
+        st.configure("Treeview", rowheight=26)
+        for b in self.nav:
+            b.configure(bg=c.primary, activebackground=Colors.update_hsv(c.primary, vd=0.06),
+                        activeforeground=x["nav_text"], selectcolor=c.info)
+        self.color_nav()
+        self.color_tabs()
+        for d in (self.clock, self.countdown):
+            d.colors(c.bg, c.fg, c.secondary)
+        self.timeline.configure(bg=c.bg)
+        self.next_at.configure(foreground=x["brass_text"])
+        self.draw_timeline()
+        self.sched_key = None
+
+    def color_nav(self):
+        sel = self.page_var.get()
+        for b, key in zip(self.nav, self.pages):
+            b.configure(fg=self.extra["nav_sel_text"] if key == sel else self.extra["nav_text"])
 
     # --- yardımcılar ---
     def save(self):
@@ -665,6 +818,7 @@ class App:
             messagebox.showerror(APP, "Ayarlar kaydedilemedi: %s" % ex)
         self.events = events_for(self.cfg, self.date) if self.date else []
         self.sched_key = None
+        self.draw_timeline()
 
     def set_cfg(self, key, value):
         self.cfg[key] = value
@@ -741,21 +895,18 @@ class App:
             finally:
                 conn.close()
 
-    def style_nav(self):
-        c = self.root.style.colors
-        self.root.style.configure("info.Horizontal.TProgressbar", thickness=4)
-        for b in self.nav:
-            b.configure(bg=c.primary, fg=c.selectfg, activebackground=Colors.update_hsv(c.primary, vd=0.06),
-                        activeforeground=c.selectfg, selectcolor=Colors.update_hsv(c.primary, vd=0.14))
-
     def show_page(self):
         for p in self.pages.values():
             p.pack_forget()
         self.pages[self.page_var.get()].pack(fill="both", expand=True)
+        self.color_nav()
 
     def card(self, parent, title):
-        f = ttk.Labelframe(parent, text="  %s  " % title, padding=14, bootstyle="secondary")
-        return f
+        """Bölüm: başlık + içerik. Çerçeve yok (apply_theme kenarlığı kaldırır)."""
+        return ttk.Labelframe(parent, text=title, padding=(0, 10, 0, 0))
+
+    def hint(self, parent, text, **kw):
+        return ttk.Label(parent, text=text, bootstyle="secondary", wraplength=kw.pop("wrap", 480), **kw)
 
     def add_log(self, text):
         self.log.insert("", 0, values=(datetime.datetime.now().strftime("%H:%M:%S"), text))
@@ -795,75 +946,148 @@ class App:
     def build_header(self, main):
         h = ttk.Frame(main)
         h.pack(fill="x")
-        self.clock = ttk.Label(h, font=(self.F, 34, "bold"))
+        self.clock = Digits(h, self.F, 40, small=20)
         self.clock.pack(side="left")
-        info = self.info = ttk.Frame(h)
-        info.pack(side="left", padx=18)
-        self.date_lbl = ttk.Label(info, font=(self.F, 11), bootstyle="secondary")
-        self.date_lbl.pack(anchor="w")
-        self.next_lbl = ttk.Label(info, font=(self.F, 12, "bold"))
-        self.next_lbl.pack(anchor="w")
-        self.play_lbl = ttk.Label(info, bootstyle="info", font=(self.F, 10))
+        info = ttk.Frame(h)
+        info.pack(side="left", padx=(18, 0), fill="y")
+        self.date_lbl = ttk.Label(info, font=(self.F, 12), bootstyle="secondary")
+        self.date_lbl.pack(anchor="w", pady=(8, 0))
+        self.play_lbl = ttk.Label(info, font=(self.F, 11))
         self.play_lbl.pack(anchor="w")
         right = ttk.Frame(h)
         right.pack(side="right")
-        ttk.Button(right, text="■  Sesi Durdur", bootstyle="danger", padding=(16, 10), command=self.stop).pack(fill="x")
+        # boşta sakin; ses çalarken kırmızı (update_view)
+        self.stop_btn = ttk.Button(right, text="Sesi durdur", bootstyle="secondary-outline", padding=(18, 10),
+                                   command=self.stop)
+        self.stop_btn.pack(fill="x")
         self.bells_var = tk.BooleanVar(value=self.cfg["bells_on"])
-        ttk.Checkbutton(right, text="Ziller aktif", variable=self.bells_var, bootstyle="success-round-toggle",
+        ttk.Checkbutton(right, text="Ziller açık", variable=self.bells_var, bootstyle="success-round-toggle",
                         command=lambda: self.set_cfg("bells_on", self.bells_var.get())).pack(anchor="e", pady=(8, 0))
-        # çalarken dolan ince çubuk; boşken ayırıcı çizgi gibi görünür
+        # çalarken pirinç renkle dolan ince çizgi; boşken ayırıcı
         self.play_bar = ttk.Progressbar(main, maximum=1000, bootstyle="info")
-        self.play_bar.pack(fill="x", pady=(12, 0))
+        self.play_bar.pack(fill="x", pady=(14, 0))
         self.bar_val = 0
 
     # --- sayfalar ---
     def page_dashboard(self, p):
-        top = ttk.Frame(p)
-        top.pack(fill="x")
-        c1 = self.card(top, "Şu an")
-        c1.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        self.period_lbl = ttk.Label(c1, font=(self.F, 18, "bold"))
-        self.period_lbl.pack(anchor="w")
-        self.period_bar = ttk.Progressbar(c1, maximum=1000, bootstyle="success-striped")
-        self.period_bar.pack(fill="x", pady=(10, 4))
-        self.period_info = ttk.Label(c1, bootstyle="secondary")
-        self.period_info.pack(anchor="w")
-        c2 = self.card(top, "Sonraki zil")
-        c2.pack(side="left", fill="both", expand=True)
-        self.count_lbl = ttk.Label(c2, font=(self.F, 18, "bold"), bootstyle="info")
-        self.count_lbl.pack(anchor="w")
-        self.count_info = ttk.Label(c2, bootstyle="secondary")
-        self.count_info.pack(anchor="w", pady=(12, 0))
-
-        low = ttk.Frame(p)
-        low.pack(fill="both", expand=True, pady=(14, 0))
-        c3 = self.card(low, "Bugünün zilleri")
-        c3.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        self.today = ttk.Treeview(c3, columns=("t", "n", "k"), show="headings", height=8, bootstyle="primary")
-        for col, title, w in (("t", "Saat", 60), ("n", "Ders", 60), ("k", "Zil", 110)):
-            self.today.heading(col, text=title, anchor="w")
-            self.today.column(col, width=w, minwidth=40, anchor="w")
-        self.today.pack(fill="both", expand=True)
-        c4 = self.card(low, "Son olaylar")
-        c4.pack(side="left", fill="both", expand=True)
-        self.log = ttk.Treeview(c4, columns=("t", "m"), show="headings", height=8)
+        self.now_lbl = ttk.Label(p, font=(self.F, 22, "bold"))
+        self.now_lbl.pack(anchor="w")
+        # günün çizelgesi: dersler tahta yeşili bloklar, teneffüsler boşluk, "şimdi" pirinç çizgi
+        self.timeline = tk.Canvas(p, height=92, highlightthickness=0, bd=0, autostyle=False)
+        self.timeline.pack(fill="x", pady=(14, 22))  # yeniden boyutlanınca on_resize çizer
+        row = ttk.Frame(p)
+        row.pack(fill="x")
+        left = ttk.Frame(row)
+        left.pack(side="left", anchor="n")
+        self.next_name = ttk.Label(left, font=(self.F, 15, "bold"))
+        self.next_name.pack(anchor="w")
+        self.countdown = Digits(left, self.F, 34, small=15)
+        self.countdown.pack(anchor="w", pady=(2, 0))
+        self.next_at = ttk.Label(left, font=(self.F, 12))
+        self.next_at.pack(anchor="w")
+        right = ttk.Frame(row)
+        right.pack(side="left", anchor="n", padx=(48, 0))
+        self.later_title = ttk.Label(right, text="Sonra", font=(self.F, 15, "bold"))
+        self.later_title.pack(anchor="w")
+        self.later = []
+        for _ in range(3):
+            line = ttk.Frame(right)
+            line.pack(anchor="w", pady=(6, 0))
+            t = ttk.Label(line, font=(self.F, 12, "bold"), width=6)
+            t.pack(side="left")
+            d = ttk.Label(line, font=(self.F, 12))
+            d.pack(side="left")
+            self.later.append((t, d))
+        bottom = ttk.Frame(p)
+        bottom.pack(fill="both", expand=True, pady=(18, 0))
+        self.log_box = ttk.Frame(bottom)
+        self.log = ttk.Treeview(self.log_box, columns=("t", "m"), show="headings", height=6)
         self.log.heading("t", text="Saat", anchor="w")
         self.log.heading("m", text="Olay", anchor="w")
-        self.log.column("t", width=60, minwidth=40, anchor="w")
-        self.log.column("m", width=160, minwidth=60, anchor="w")
-        self.log.pack(fill="both", expand=True)
+        self.log.column("t", width=80, minwidth=60, stretch=False, anchor="w")
+        self.log.column("m", width=300, minwidth=120, anchor="w")
+        self.log.pack(fill="both", expand=True, pady=(6, 0))
+
+        def toggle_log():
+            if self.log_box.winfo_manager():
+                self.log_box.pack_forget()
+                self.log_btn.configure(text="Olay kaydını göster")
+            else:
+                self.log_box.pack(fill="both", expand=True, after=self.log_btn)
+                self.log_btn.configure(text="Olay kaydını gizle")
+        self.log_btn = ttk.Button(bottom, text="Olay kaydını göster", bootstyle="secondary-link", command=toggle_log)
+        self.log_btn.pack(anchor="w")
+
+    def draw_timeline(self):
+        cv = self.timeline
+        cv.delete("all")
+        w = cv.winfo_width()
+        span = timeline_span(self.events)
+        c, x = self.root.style.colors, self.extra
+        if w < 50:
+            return
+        self.now_line = None
+        if not span:
+            cv.create_text(0, 38, text="Bugün için zil saati yok.", anchor="w", fill=c.secondary, font=(self.F, 12))
+            return
+        start, end = span
+        pad = 4
+
+        def px(t):
+            return pad + (t - start) * (w - 2 * pad) / float(end - start)
+        top, bot = 30, 54
+        cv.create_line(pad, (top + bot) / 2, w - pad, (top + bot) / 2, fill=c.border, width=2)
+        day = self.cfg["days"][day_key(self.date)] if self.date else {"lessons": []}
+        for n, (s, e) in enumerate(day["lessons"], 1):
+            x0, x1 = px(parse_hhmm(s)), px(parse_hhmm(e))
+            cv.create_rectangle(x0, top, x1, bot, fill=x["block"], outline="")
+            if x1 - x0 > 22:
+                cv.create_text((x0 + x1) / 2, (top + bot) / 2, text=str(n), fill=x["block_text"],
+                               font=(self.F, 10, "bold"))
+        for t, kind, _ in self.events:
+            cv.create_line(px(t), bot + 3, px(t), bot + 9, fill=c.secondary)
+        f = (self.F, 10)
+        cv.create_text(pad, bot + 22, text=fmt_hhmm(self.events[0][0]), anchor="w", fill=c.secondary, font=f)
+        cv.create_text(w - pad, bot + 22, text=fmt_hhmm(self.events[-1][0]), anchor="e", fill=c.secondary, font=f)
+        self.now_line = cv.create_line(0, top - 8, 0, bot + 9, fill=x["brass_line"], width=3)
+        self.now_label = cv.create_text(0, top - 9, text="şimdi", anchor="s", fill=x["brass_text"],
+                                        font=(self.F, 10, "bold"))
+        self.timeline_px = px
+        self.move_now(datetime.datetime.now())
+
+    def move_now(self, now):
+        span = timeline_span(self.events)
+        if not span or not getattr(self, "now_line", None):
+            return
+        sec = now.hour * 3600 + now.minute * 60 + now.second
+        visible = span[0] <= sec <= span[1]
+        state = "normal" if visible else "hidden"
+        x = self.timeline_px(min(max(sec, span[0]), span[1]))
+        self.timeline.coords(self.now_line, x, 22, x, 63)
+        w = self.timeline.winfo_width()
+        self.timeline.coords(self.now_label, min(max(x, 18), w - 18), 21)
+        self.timeline.itemconfigure(self.now_line, state=state)
+        self.timeline.itemconfigure(self.now_label, state=state)
 
     def page_schedule(self, p):
         top = ttk.Frame(p)
         top.pack(fill="x")
         self.day_var = tk.StringVar(value="haftaici")
+        self.tabs = []
         for key, name in DAYS:
-            ttk.Radiobutton(top, text=name, value=key, variable=self.day_var, bootstyle="primary-outline-toolbutton",
-                            padding=(10, 6), command=self.show_day).pack(side="left")
-        off = ttk.Combobox(top, values=[n for _, n in OFFSETS], state="readonly", width=14)
+            t = tk.Radiobutton(top, text=name, value=key, variable=self.day_var, command=self.show_day,
+                               indicatoron=False, relief="flat", bd=0, highlightthickness=1, padx=16, pady=6,
+                               font=(self.F, 11), cursor="hand2", autostyle=False)
+            t.pack(side="left", padx=(0, 6))
+            self.tabs.append((t, key))
+        orow = ttk.Frame(p)
+        orow.pack(fill="x", pady=(14, 0))
+        ttk.Label(orow, text="Öğrenci zili").pack(side="left", padx=(0, 10))
+        off = ttk.Combobox(orow, values=[n for _, n in OFFSETS], state="readonly", width=14)
         off.set(dict(OFFSETS).get(self.cfg["teacher_offset"], OFFSETS[0][1]))
-        off.pack(side="right")
-        ttk.Label(top, text="Öğrenci zili:").pack(side="right", padx=(12, 6))
+        off.pack(side="left")
+        self.hint(orow, "Tüm günler için").pack(side="left", padx=(10, 0))
+
         def off_changed(_):
             new = OFFSETS[off.current()][0]
             for key, name in DAYS:  # kapalı günler de: sonradan açılınca yanlış sırada çalmasın
@@ -873,10 +1097,12 @@ class App:
                     messagebox.showerror(APP, "%s: %s" % (name, err))
                     return
             self.set_cfg("teacher_offset", new)
+            for refresh in self.previews:
+                refresh()
         off.bind("<<ComboboxSelected>>", off_changed)
         holder = ttk.Frame(p)
-        holder.pack(fill="both", expand=True, pady=(10, 0))
-        self.day_frames = {}
+        holder.pack(fill="both", expand=True, pady=(18, 0))
+        self.day_frames, self.previews = {}, []
         for key, name in DAYS:
             self.day_frames[key] = self.day_editor(holder, key, name)
         self.show_day()
@@ -885,33 +1111,85 @@ class App:
         for f in self.day_frames.values():
             f.pack_forget()
         self.day_frames[self.day_var.get()].pack(fill="both", expand=True)
+        self.color_tabs()
+
+    def color_tabs(self):
+        c, sel = self.root.style.colors, self.day_var.get()
+        for t, key in self.tabs:
+            on = key == sel
+            t.configure(bg=c.bg, fg=self.extra["nav_sel_text"] if on else c.fg, selectcolor=c.info,
+                        activebackground=c.active, activeforeground=c.fg, highlightbackground=c.border)
 
     def day_editor(self, holder, key, name):
         day = self.cfg["days"][key]
-        f = self.card(holder, name + " ders saatleri (SS:DD, boş satırlar atlanır)")
+        f = self.card(holder, name + " ders saatleri")
+        head = ttk.Frame(f)
+        head.pack(fill="x")
         on = tk.BooleanVar(value=day["on"])
 
         def toggled():  # diğer anahtarlar gibi hemen kaydet; Kaydet'e basmayı unutan da etkilenmesin
             self.cfg["days"][key]["on"] = on.get()
             self.save()
-        ttk.Checkbutton(f, text=DAY_TOGGLE[key], variable=on, bootstyle="success-round-toggle",
-                        command=toggled).grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 4))
+        ttk.Checkbutton(head, text=DAY_TOGGLE[key], variable=on, bootstyle="success-round-toggle",
+                        command=toggled).pack(side="left")
+        self.hint(f, "Saatleri 08:30 biçiminde yazın. Öğrenci zili, yukarıda seçilen süre kadar önce çalar.").pack(
+            anchor="w", pady=(6, 10))
+        grid = ttk.Frame(f)
+        grid.pack(fill="x")
+        values = [list(l) for l in day["lessons"]]
         rows = []
-        for c in (0, 4):
-            ttk.Label(f, text="Giriş", bootstyle="secondary").grid(row=1, column=c + 1)
-            ttk.Label(f, text="Çıkış", bootstyle="secondary").grid(row=1, column=c + 2)
-        for i in range(MAX_LESSONS):
-            r, c = i % 8 + 2, i // 8 * 4
-            s, e = day["lessons"][i] if i < len(day["lessons"]) else ("", "")
-            sv, ev = tk.StringVar(value=s), tk.StringVar(value=e)
-            ttk.Label(f, text="%d. ders" % (i + 1)).grid(row=r, column=c, sticky="w", padx=(30 if c else 0, 8), pady=1)
-            ttk.Entry(f, textvariable=sv, width=7, justify="center").grid(row=r, column=c + 1, padx=3, pady=1)
-            ttk.Entry(f, textvariable=ev, width=7, justify="center").grid(row=r, column=c + 2, padx=3, pady=1)
-            rows.append((sv, ev))
+
+        def preview(sv, lbl):
+            try:
+                s = parse_hhmm(sv.get()) - self.cfg["teacher_offset"]
+                lbl.configure(text="öğrenci zili %s" % fmt_hhmm(s) if self.cfg["teacher_offset"] else "")
+            except ValueError:
+                lbl.configure(text="")
+
+        def render():
+            for w in grid.winfo_children():
+                w.destroy()
+            del rows[:]
+            per_col = 8 if len(values) > 8 else max(len(values), 1)
+            for i, (s, e) in enumerate(values):
+                r, c = i % per_col, i // per_col * 6
+                sv, ev = tk.StringVar(value=s), tk.StringVar(value=e)
+                ttk.Label(grid, text="%d. ders" % (i + 1), width=7).grid(row=r, column=c, sticky="w",
+                                                                          padx=(28 if c else 0, 6), pady=3)
+                ttk.Entry(grid, textvariable=sv, width=6, justify="center").grid(row=r, column=c + 1, pady=3)
+                ttk.Label(grid, text="–").grid(row=r, column=c + 2, padx=6)
+                ttk.Entry(grid, textvariable=ev, width=6, justify="center").grid(row=r, column=c + 3, pady=3)
+                lbl = ttk.Label(grid, bootstyle="secondary", width=17)
+                lbl.grid(row=r, column=c + 4, sticky="w", padx=(12, 0))
+                ttk.Button(grid, text="Sil", bootstyle="secondary-link", padding=(4, 0),
+                           command=lambda i=i: remove(i)).grid(row=r, column=c + 5)
+                sv.trace_add("write", lambda *_, sv=sv, lbl=lbl: preview(sv, lbl))
+                preview(sv, lbl)
+                rows.append((sv, ev, lbl))
+
+        def sync():  # ekrandaki değerleri listeye al (ekle/sil yeniden çizmeden önce)
+            values[:] = [[s.get(), e.get()] for s, e, _ in rows]
+
+        def add():
+            sync()
+            if len(values) >= MAX_LESSONS:
+                return
+            try:
+                last = parse_hhmm(values[-1][1]) if values else parse_hhmm("08:20")
+                values.append([fmt_hhmm(last + 600), fmt_hhmm(last + 3000)])  # 10 dk teneffüs, 40 dk ders
+            except ValueError:
+                values.append(["", ""])
+            render()
+
+        def remove(i):
+            sync()
+            del values[i]
+            render()
 
         def save():
+            sync()
             try:
-                lessons = validate_lessons([(s.get(), e.get()) for s, e in rows])
+                lessons = validate_lessons(values)
             except ValueError as ex:
                 messagebox.showerror(APP, str(ex))
                 return
@@ -921,22 +1199,26 @@ class App:
                 return
             self.cfg["days"][key] = {"on": on.get(), "lessons": lessons}
             self.save()
-            for i, (sv, ev) in enumerate(rows):  # kaydedilen düzeni göster (boşluklar kapanır)
-                sv.set(lessons[i][0] if i < len(lessons) else "")
-                ev.set(lessons[i][1] if i < len(lessons) else "")
+            values[:] = [list(l) for l in lessons]  # boş satırlar kapanır
+            render()
             messagebox.showinfo(APP, "%s ders saatleri kaydedildi." % name)
-        ttk.Button(f, text="Kaydet", bootstyle="success", padding=(22, 6), command=save).grid(
-            row=0, column=5, columnspan=3, sticky="e", pady=(0, 4))
+        render()
+        self.previews.append(lambda: [preview(sv, lbl) for sv, _, lbl in rows])
+        bar = ttk.Frame(f)
+        bar.pack(fill="x", pady=(14, 0))
+        ttk.Button(bar, text="Ders ekle", bootstyle="success-outline", command=add).pack(side="left")
+        ttk.Button(bar, text="Kaydet", bootstyle="primary", padding=(22, 6), command=save).pack(side="right")
         return f
 
-    def bell_card(self, parent, key, title):
+    def bell_row(self, grid, r, key):
         b = self.cfg["bells"][key]
-        c = self.card(parent, title)
-        mel = ttk.Combobox(c, state="readonly", width=22)
+        name = ttk.Label(grid, text=BELL_NAMES[key], font=(self.F, 12, "bold"))
+        name.grid(row=r, column=0, columnspan=3, sticky="w", pady=(12, 4))
+        mel = ttk.Combobox(grid, state="readonly", width=20)
         mel.set(b["melody"])
-        mel.grid(row=0, column=0, padx=(0, 12))
-        warn = ttk.Label(c, text="", bootstyle="danger")
-        warn.grid(row=1, column=0, columnspan=3, sticky="w")
+        mel.grid(row=r + 1, column=0, sticky="w")
+        warn = ttk.Label(grid, text="", bootstyle="danger")
+        warn.grid(row=r + 2, column=0, columnspan=3, sticky="w")
 
         def changed(_=None):
             b["melody"] = mel.get()
@@ -947,33 +1229,40 @@ class App:
             b["volume"] = v
             self.save()
         mel.bind("<<ComboboxSelected>>", changed)
-        self.volume(c, b["volume"], vol_changed, length=90).grid(row=0, column=1, padx=(0, 8))
-        ttk.Button(c, text="▶  Dinle", bootstyle="info-outline",
-                   command=lambda: self.ring((0, key, 0), test=True)).grid(row=0, column=2)
+        vol = self.volume(grid, b["volume"], vol_changed, length=100)
+        vol.grid(row=r + 1, column=1, padx=(16, 8))
+        play = ttk.Button(grid, text="Dinle", bootstyle="success-outline",
+                          command=lambda: self.ring((0, key, 0), test=True))
+        play.grid(row=r + 1, column=2)
         self.bell_widgets.append((mel, warn, key))
-        return c
+        return [name, mel, warn, vol, play]
 
     def page_bells(self, p):
         self.bell_widgets = []
-        for key, name in BELLS:
-            self.bell_card(p, key, name).pack(fill="x", pady=(0, 8))
-        son = self.bell_card(p, "son", "Son Zil · günün son dersi bitince çalar")
+        c = self.card(p, "Zil melodileri")
+        c.pack(fill="x")
+        grid = ttk.Frame(c)
+        grid.pack(fill="x")
+        for i, (key, _) in enumerate(BELLS):
+            self.bell_row(grid, i * 3, key)
+        son = self.bell_row(grid, 10, "son")
+        for w in son:
+            w.grid_remove()
 
         def toggle_son():
-            if son.winfo_manager():
-                son.pack_forget()
-                btn.configure(text="▸  Son Zil")
-            else:
-                son.pack(fill="x", pady=(0, 8), after=btn)
-                btn.configure(text="▾  Son Zil")
-        btn = ttk.Button(p, text="▸  Son Zil", bootstyle="secondary-link", command=toggle_son)
-        btn.pack(anchor="w")
+            shown = son[0].winfo_manager()
+            for w in son:
+                w.grid_remove() if shown else w.grid()
+            btn.configure(text="Son zil ayarını göster" if shown else "Son zil ayarını gizle")
+        btn = ttk.Button(grid, text="Son zil ayarını göster", bootstyle="secondary-link", command=toggle_son)
+        btn.grid(row=9, column=0, columnspan=3, sticky="w", pady=(16, 0))
+        self.hint(c, "Son zil, günün son dersi bitince teneffüs zili yerine çalar.").pack(anchor="w", pady=(10, 0))
         self.refresh_lists()
         bar = ttk.Frame(p)
-        bar.pack(fill="x", pady=(8, 0))
+        bar.pack(fill="x", pady=(20, 0))
         for text, cmd in (("Melodi ekle…", lambda: self.add_file(MELODI, self.refresh_lists)),
                           ("Klasörü aç", lambda: open_folder(MELODI))):
-            ttk.Button(bar, text=text, bootstyle="secondary-outline", command=cmd).pack(side="left", padx=(0, 6))
+            ttk.Button(bar, text=text, bootstyle="secondary-outline", command=cmd).pack(side="left", padx=(0, 8))
 
     def refresh_lists(self):
         mels = audio_files(MELODI)
@@ -981,70 +1270,75 @@ class App:
             mel.configure(values=mels)
             name = self.cfg["bells"][key]["melody"]
             warn.configure(text="" if name in mels else "Ses dosyası yok: %s" % (name or "(seçilmedi)"))
+            if name in mels:  # boş uyarı satırı yer kaplamasın
+                warn.grid_remove()
+            elif mel.winfo_manager():  # gizli Son zil satırının uyarısı da gizli kalsın
+                warn.grid()
 
     def page_music(self, p):
         c = self.card(p, "Teneffüs müziği")
         c.pack(fill="x")
         on = tk.BooleanVar(value=self.cfg["music"]["on"])
-        ttk.Checkbutton(c, text="Teneffüslerde Müzik klasöründen rastgele çal", variable=on, bootstyle="round-toggle",
+        ttk.Checkbutton(c, text="Teneffüslerde Müzik klasöründen rastgele çal", variable=on, bootstyle="success-round-toggle",
                         command=lambda: (self.cfg["music"].update(on=on.get()), self.save())).pack(anchor="w")
         row = ttk.Frame(c)
         row.pack(fill="x", pady=(12, 0))
-        ttk.Label(row, text="Ses").pack(side="left", padx=(0, 8))
+        ttk.Label(row, text="Ses").pack(side="left", padx=(0, 10))
 
         def vol(v):
             self.cfg["music"]["volume"] = v
             self.save()
-        self.volume(row, self.cfg["music"]["volume"], vol, length=120).pack(side="left")
+        self.volume(row, self.cfg["music"]["volume"], vol, length=140).pack(side="left")
         row = ttk.Frame(c)
-        row.pack(fill="x", pady=(10, 0))
-        ttk.Button(row, text="▶  Hemen çal", bootstyle="info",
-                   command=lambda: self.play_music("test")).pack(side="left", padx=(0, 6))
+        row.pack(fill="x", pady=(12, 0))
+        ttk.Button(row, text="Şimdi çal", bootstyle="success-outline",
+                   command=lambda: self.play_music("test")).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Müzik ekle…", bootstyle="secondary-outline",
-                   command=lambda: self.add_file(MUZIK)).pack(side="left", padx=(0, 6))
+                   command=lambda: self.add_file(MUZIK)).pack(side="left", padx=(0, 8))
         ttk.Button(row, text="Klasörü aç", bootstyle="secondary-outline",
                    command=lambda: open_folder(MUZIK)).pack(side="left")
-        ttk.Label(c, text="Müzik, sonraki zilden 30 saniye önce yavaşça susar.", bootstyle="secondary",
-                  wraplength=460).pack(anchor="w", pady=(8, 0))
+        self.hint(c, "Müzik, sonraki zilden 30 saniye önce yavaşça susar.").pack(anchor="w", pady=(10, 0))
 
         m = self.card(p, "Marşlar")
-        m.pack(fill="x", pady=(12, 0))
+        m.pack(fill="x", pady=(24, 0))
         grid = ttk.Frame(m)
         grid.pack(fill="x")
         grid.columnconfigure((0, 1), weight=1, uniform="m")
         for i, name in enumerate(audio_files(MARS)):
             label = march_label(name)
             style = "danger" if "siren" in label.lower() else "primary"
-            ttk.Button(grid, text="▶  " + label, bootstyle=style, padding=(10, 10),
-                       command=lambda n=name, l=label: self.play_march(n, l)).grid(row=i // 2, column=i % 2, padx=3, pady=3, sticky="ew")
+            ttk.Button(grid, text=label, bootstyle=style, padding=(10, 12),
+                       command=lambda n=name, l=label: self.play_march(n, l)).grid(row=i // 2, column=i % 2, padx=(0, 8), pady=(0, 8), sticky="ew")
         row = ttk.Frame(m)
-        row.pack(fill="x", pady=(12, 0))
-        ttk.Label(row, text="Ses").pack(side="left", padx=(0, 8))
-        self.volume(row, self.cfg["march_volume"], lambda v: self.set_cfg("march_volume", v), length=120).pack(side="left")
+        row.pack(fill="x", pady=(8, 0))
+        ttk.Label(row, text="Ses").pack(side="left", padx=(0, 10))
+        self.volume(row, self.cfg["march_volume"], lambda v: self.set_cfg("march_volume", v), length=140).pack(side="left")
         ttk.Button(row, text="Klasörü aç", bootstyle="secondary-outline",
                    command=lambda: open_folder(MARS)).pack(side="right")
-        ttk.Label(m, text="Gelen zil marşı kesmez, marş bitince çalar. Yeni marşlar yeniden açılınca görünür.",
-                  bootstyle="secondary", wraplength=460).pack(anchor="w", pady=(8, 0))
+        self.hint(m, "Marş çalarken gelen zil marşı kesmez; marş bitince çalar. Klasöre eklenen marşlar, "
+                     "Zilli yeniden açılınca düğme olur.").pack(anchor="w", pady=(10, 0))
 
     def page_settings(self, p):
         c = self.card(p, "Görünüm")
         c.pack(fill="x")
-        ttk.Label(c, text="Tema").pack(side="left", padx=(0, 10))
-        themes = sorted(self.root.style.theme_names())
-        th = ttk.Combobox(c, values=themes, state="readonly", width=18)
-        th.set(self.root.style.theme_use())
+        row = ttk.Frame(c)
+        row.pack(fill="x")
+        ttk.Label(row, text="Tema").pack(side="left", padx=(0, 10))
+        names = dict(THEMES)
+        th = ttk.Combobox(row, values=[n for _, n in THEMES], state="readonly", width=18)
+        th.set(names.get(self.root.style.theme_use(), THEMES[0][1]))
         th.pack(side="left")
 
         def theme_changed(_):
-            self.root.style.theme_use(th.get())
-            self.style_nav()
-            self.set_cfg("theme", th.get())
+            key = THEMES[th.current()][0]
+            self.root.style.theme_use(key)
+            self.apply_theme()
+            self.set_cfg("theme", key)
         th.bind("<<ComboboxSelected>>", theme_changed)
-        ttk.Label(c, text="Koyu: darkly, superhero, cyborg, solar, vapor", bootstyle="secondary",
-                  wraplength=220).pack(side="left", padx=12)
+        self.hint(c, "Yüksek kontrast, projeksiyon ve eski ekranlarda daha kolay okunur.").pack(anchor="w", pady=(8, 0))
 
         s = self.card(p, "Başlangıç")
-        s.pack(fill="x", pady=(12, 0))
+        s.pack(fill="x", pady=(24, 0))
         auto = tk.BooleanVar(value=get_autostart())
 
         def auto_changed():
@@ -1055,18 +1349,17 @@ class App:
                 messagebox.showerror(APP, "Ayarlanamadı: %s" % ex)
         ttk.Checkbutton(s, text="Bilgisayar açılınca Zilli otomatik başlasın", variable=auto,
                         bootstyle="success-round-toggle", command=auto_changed).pack(anchor="w")
-        ttk.Label(s, text="Zilli oturum açılınca başlar. Otomatik oturum açma (Windows: netplwiz) önerilmez: "
-                          "bilgisayarı açan herkes o hesaba girer.",
-                  bootstyle="secondary", wraplength=460).pack(anchor="w", pady=(8, 0))
-        ttk.Label(s, text="⚠ Güvenlik: Otomatik oturum açacaksanız yalnızca zil için ayrı, yönetici olmayan bir hesap "
+        self.hint(s, "Zilli oturum açılınca başlar. Otomatik oturum açma (Windows: netplwiz) önerilmez: "
+                     "bilgisayarı açan herkes o hesaba girer.").pack(anchor="w", pady=(8, 0))
+        ttk.Label(s, text="Güvenlik: Otomatik oturum açacaksanız yalnızca zil için ayrı, yönetici olmayan bir hesap "
                           "kullanın; o hesapta e-posta, tarayıcı şifresi veya okul dosyası bulunmasın. Oturum açılınca "
                           "ekranı kilitleyin (Windows+L): Zilli kilitliyken de zil çalar.",
-                  bootstyle="warning", wraplength=460).pack(anchor="w", pady=(6, 0))
+                  bootstyle="warning", wraplength=480).pack(anchor="w", pady=(8, 0))
 
         d = self.card(p, "Veri klasörü")
-        d.pack(fill="x", pady=(12, 0))
+        d.pack(fill="x", pady=(24, 0))
         ttk.Button(d, text="Aç", bootstyle="secondary-outline", command=lambda: open_folder(DATA)).pack(side="right")
-        ttk.Label(d, text=DATA, wraplength=400).pack(side="left")
+        ttk.Label(d, text=DATA, wraplength=420).pack(side="left")
 
     # --- işler ---
     def ring(self, ev, test=False):
@@ -1075,7 +1368,7 @@ class App:
         items = [(os.path.join(MELODI, b["melody"]), b["volume"])]
         if not test:
             self.music_hold = False
-            self.add_log("%d. ders %s" % (n, BELL_NAMES[kind]) + ("" if self.cfg["bells_on"] else " (ziller kapalı)"))
+            self.add_log("%d. ders, %s" % (n, BELL_NAMES[kind].lower()) + ("" if self.cfg["bells_on"] else " (ziller kapalı)"))
             if not self.cfg["bells_on"]:
                 return
         if self.player.kind == "march":  # marşı kesme, bitince çal
@@ -1148,6 +1441,7 @@ class App:
             self.date, self.last = now.date(), sec
             self.events = events_for(self.cfg, self.date)
             self.sched_key = None
+            self.draw_timeline()
         ev = due_event(self.events, self.last, sec)
         self.last = sec
         if ev:
@@ -1162,55 +1456,60 @@ class App:
         self.update_view(now, sec)
 
     def update_view(self, now, sec):
-        self.set_text(self.clock, now.strftime("%H:%M:%S"))
+        self.clock.set(now.strftime("%H:%M"), now.strftime(":%S"))
         self.set_text(self.date_lbl, "%s, %d %s %d" % (GUNLER[now.weekday()], now.day, AYLAR[now.month - 1], now.year))
-        nxt = [e for e in self.events if e[0] > sec]
-        if nxt:
-            t, kind, n = nxt[0]
-            left = t - sec
-            self.set_text(self.next_lbl, "Sonraki: %s · %d. ders %s" % (fmt_hhmm(t), n, BELL_NAMES[kind]))
-            self.set_text(self.count_lbl, "%d dk %02d sn" % (left // 60, left % 60) if left < 3600
-                          else "%d sa %02d dk" % (left // 3600, left % 3600 // 60))
-            self.set_text(self.count_info, "%s · %d. ders %s" % (fmt_hhmm(t), n, BELL_NAMES[kind]))
-        else:
-            for w in (self.next_lbl, self.count_lbl):
-                self.set_text(w, "Bugün başka zil yok")
-            self.set_text(self.count_info, "")
+
+        # çalan ses: adı ve süresi; boştaysa durdur düğmesi sakin
         val = 0
-        if self.player.title:
+        playing = bool(self.player.title)
+        if playing:
             pos, d = max(0, pygame.mixer.music.get_pos()) / 1000.0, self.player.duration
-            self.set_text(self.play_lbl, "♪  %s   %s" % (self.player.title, "%s / %s" % (mmss(pos), mmss(d)) if d else mmss(pos)))
+            self.set_text(self.play_lbl, "Çalıyor: %s   %s" % (self.player.title, "%s / %s" % (mmss(pos), mmss(d)) if d else mmss(pos)))
             val = min(1000, int(1000 * pos / d)) if d else 0
         else:
             self.set_text(self.play_lbl, self.player.error)
-        style = "danger" if self.player.error and not self.player.title else "info"
+        style = "danger" if self.player.error and not playing else "default"
         if self.shown.get("play_style") != style:
             self.shown["play_style"] = style
             self.play_lbl.configure(bootstyle=style)
+        btn = "danger" if playing else "secondary-outline"
+        if self.shown.get("stop_style") != btn:
+            self.shown["stop_style"] = btn
+            self.stop_btn.configure(bootstyle=btn)
         if val != self.bar_val:
             self.bar_val = val
             self.play_bar.configure(value=val)
 
         day = self.cfg["days"][day_key(now.date())]
-        label, s, e = current_period(day["lessons"], sec) if day["on"] else ("Bugün zil yok", None, None)
-        self.set_text(self.period_lbl, label)
-        if s is None:
-            self.period_bar.configure(value=0)
-            self.set_text(self.period_info, "")
+        self.set_text(self.now_lbl, now_text(day["on"], day["lessons"], sec))
+        if self.shown.get("now_min") != sec // 30:  # çizgi 30 sn'de bir kayar
+            self.shown["now_min"] = sec // 30
+            self.move_now(now)
+
+        nxt = [e for e in self.events if e[0] > sec]
+        if nxt:
+            t, kind, n = nxt[0]
+            self.set_text(self.next_name, BELL_NAMES[kind])
+            self.countdown.set(countdown_text(t - sec), " kaldı")
+            self.set_text(self.next_at, "Saat %s, %d. ders" % (fmt_hhmm(t), n))
         else:
-            self.period_bar.configure(value=1000 * (sec - s) // (e - s))
-            self.set_text(self.period_info, "%s – %s · %d dk kaldı" % (fmt_hhmm(s), fmt_hhmm(e), (e - sec + 59) // 60))
+            self.set_text(self.next_name, "Bugün başka zil yok")
+            self.countdown.set("")
+            self.set_text(self.next_at, "")
 
         key = (len(nxt), self.root.style.theme_use())
-        if key != self.sched_key:  # tablo yalnızca zil geçince veya tema değişince yenilenir
+        if key != self.sched_key:  # sonraki zil listesi yalnızca zil geçince veya tema değişince yenilenir
             self.sched_key = key
-            colors = self.root.style.colors
-            self.today.tag_configure("past", foreground=colors.secondary)
-            self.today.tag_configure("next", foreground=colors.selectfg, background=colors.primary)
-            self.today.delete(*self.today.get_children())
-            for i, (t, kind, n) in enumerate(self.events):
-                tag = "past" if t <= sec else "next" if nxt and (t, kind, n) == nxt[0] else ""
-                self.today.insert("", "end", values=(fmt_hhmm(t), "%d. ders" % n, BELL_NAMES[kind]), tags=(tag,))
+            later = nxt[1:4]
+            self.set_text(self.later_title, "Sonra" if later else "")
+            for i, (t_lbl, d_lbl) in enumerate(self.later):
+                if i < len(later):
+                    t, kind, n = later[i]
+                    self.set_text(t_lbl, fmt_hhmm(t))
+                    self.set_text(d_lbl, "%s, %d. ders" % (BELL_NAMES[kind], n))
+                else:
+                    self.set_text(t_lbl, "")
+                    self.set_text(d_lbl, "")
 
     def on_close(self):
         mini = "Sistem tepsisine küçült" if self.tray else "Görev çubuğuna küçült"
@@ -1270,10 +1569,10 @@ def main():
             save_config(cfg)
         except OSError:
             pass
-    try:
-        root = ttk.Window(themename=cfg["theme"])
-    except tk.TclError:  # bilinmeyen tema adı
-        root = ttk.Window(themename="flatly")
+    load_fonts()  # pencere açılmadan: Tk yazı tiplerini ilk kullanımda arar
+    root = ttk.Window(themename="flatly")  # pencere hazır olsun; hemen Zilli temasına geçilir
+    register_themes(root.style)
+    root.style.theme_use(cfg["theme"] if cfg["theme"] in THEME_COLORS else "acik")
     app = App(root, cfg)
     root.update_idletasks()
     root.place_window_center()  # kayıtlı/varsayılan konum ekran dışında kalmasın

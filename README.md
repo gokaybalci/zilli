@@ -18,12 +18,12 @@ Hazır paketler [Releases](../../releases) sayfasındadır:
 
 ## Özellikler
 
-- **Pano:** büyük saat, şu anki ders/teneffüs ve ilerleme çubuğu, sonraki zile geri sayım, günün zil listesi
+- **Pano:** büyük saat, günün çizelgesi (dersler, teneffüsler ve "şimdi" çizgisi), sonraki zile geri sayım ve sıradaki üç zil; olay kaydı tek tıkla açılır
 - **Zil Saatleri:** Hafta İçi / Cumartesi / Pazar için ayrı, 16 derse kadar; öğrenci zili dersten 15 sn – 3 dk önce, öğretmen zili ders başında, teneffüs zili ders sonunda
 - **Melodiler:** öğrenci, öğretmen ve teneffüs zili için ayrı melodi ve ses seviyesi; günün son zili için ayrı "Son Zil" (varsayılan MEB Çıkış Zili); dosya ekleme düğmesi
 - Çalan sesin adı, süresi ve ilerleme çubuğu üst bilgide görünür
 - **Müzik ve Marşlar:** teneffüste rastgele müzik (sonraki zilden 30 sn önce yavaşça susar), İstiklal Marşı, İstiklal Marşı (Enstrümental), Saygı Duruşu + İstiklal Marşı ve Siren
-- **Ayarlar:** 18 tema (açık ve koyu), açılışta otomatik başlatma
+- **Ayarlar:** üç tema (Açık, Gece, Yüksek kontrast; tüm yazılar WCAG okunurluk oranlarını karşılar), açılışta otomatik başlatma
 - **Sistem tepsisi:** pencere kapatılırken küçültme sorulur; küçültülünce görev çubuğunda yer kaplamaz, tepsi simgesinden açılır. Linux'ta StatusNotifierItem (KDE, GNOME AppIndicator, XFCE, Cinnamon), yoksa eski XEmbed tepsisi kullanılır
 - Bilgisayar uykudan uyanırsa 1 dakikadan eski zilleri çalmaz; aynı anda iki kopya açılmaz; ayarlar elektrik kesintisinde bozulmaz
 - Eksik veya bozuk ses dosyası programı durdurmaz: Melodiler sayfasında "Ses dosyası yok" yazar, elle çalınınca hata penceresi açılır, zamanlı zilde "Son olaylar"a yazılır. Bozuk ayar dosyası `zilli.json.bozuk` olarak kenara alınır, varsayılanlarla açılır
@@ -33,7 +33,7 @@ Ses biçimleri: mp3, wav, ogg, flac (mid yalnız Windows'ta).
 ## Kurulum ve otomatik başlatma
 
 - **Windows:** `Zilli-Kurulum-….exe`'yi çalıştırın. Yönetici gerekmez. "Bilgisayar açılınca başlasın" işaretliyse oturum açılınca simge durumunda başlar.
-- **.deb:** `sudo apt install ./zilli_1.0.1_amd64.deb` — tüm kullanıcılar için açılışta başlar.
+- **.deb:** `sudo apt install ./zilli_1.1.0_amd64.deb` — tüm kullanıcılar için açılışta başlar.
 - **AppImage:** dosyaya çalıştırma izni verip (`chmod +x`) bir kez açın; kendini açılışa ekler.
 
 Linux'ta ses dosyaları ve ayarlar `~/Zilli` klasöründedir; Windows'ta programın kurulduğu klasördedir. Ayarlar sayfasında "Veri klasörü → Aç".
@@ -71,7 +71,10 @@ packaging/windows/build.sh   # Windows kurulumu (wine gerekir)
 - Windows paketi resmi 32 bit Python 3.7.9, PyInstaller 5.13.2 ve Inno Setup 6.2.2 ile hazırlanır. Python 3.8+ Windows 7'de KB2533623 güncellemesi olmadan açılmaz; bu yüzden 3.7.9'da kalın. Microsoft'un Universal C Runtime DLL'leri programın yanına konur, böylece KB2999226 da gerekmez.
 - Programla gelen sesler `sounds/` klasöründedir (Melodiler, Marşlar). Program müzik içermez; teneffüs müziğini kullanıcı "Müzik ekle…" ile ekler.
 - Simge ve logo `assets/` içindedir (`zilli.svg`, `zilli-logo.svg`); PNG/ICO dosyaları bu SVG'den üretilmiştir.
+- Yazı tipi: [Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next) (Regular ve Bold), `assets/fonts/` içinde programla gelir ve kurulmadan yalnız Zilli için yüklenir; yüklenemezse sistem yazı tipi kullanılır.
 
 ## Lisans
 
 Zilli özgür yazılımdır: [GNU Genel Kamu Lisansı v3](LICENSE) (GPL-3.0-or-later) koşullarıyla kullanabilir, değiştirebilir ve dağıtabilirsiniz. Copyright © 2026 Gökay.
+
+Atkinson Hyperlegible Next yazı tipi SIL Open Font License 1.1 ile dağıtılır ([assets/fonts/OFL.txt](assets/fonts/OFL.txt)); Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors.
