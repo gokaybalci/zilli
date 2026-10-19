@@ -33,7 +33,7 @@ Ses biçimleri: mp3, wav, ogg, flac (mid yalnız Windows'ta).
 ## Kurulum ve otomatik başlatma
 
 - **Windows:** `Zilli-Kurulum-….exe`'yi çalıştırın. Yönetici gerekmez. "Bilgisayar açılınca başlasın" işaretliyse oturum açılınca simge durumunda başlar.
-- **.deb:** `sudo apt install ./zilli_1.1.0_amd64.deb` — tüm kullanıcılar için açılışta başlar.
+- **.deb:** `sudo apt install ./zilli_1.1.1_amd64.deb` — tüm kullanıcılar için açılışta başlar.
 - **AppImage:** dosyaya çalıştırma izni verip (`chmod +x`) bir kez açın; kendini açılışa ekler.
 
 Linux'ta ses dosyaları ve ayarlar `~/Zilli` klasöründedir; Windows'ta programın kurulduğu klasördedir. Ayarlar sayfasında "Veri klasörü → Aç".

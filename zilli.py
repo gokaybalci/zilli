@@ -16,15 +16,13 @@ import threading
 import wave
 
 if os.name == "nt" and getattr(sys, "frozen", False):
-    # Tcl yolu ANSI'ye çevirir; kullanıcı adındaki Türkçe harfler (ş, ı...) bozulursa init.tcl bulunamaz.
-    # Kısa (8.3) yol her zaman ASCII'dir.
-    import ctypes
-    for _var in ("TCL_LIBRARY", "TK_LIBRARY"):
-        _p = os.environ.get(_var, "")
-        if _p and not _p.isascii():
-            _buf = ctypes.create_unicode_buffer(1024)
-            if ctypes.windll.kernel32.GetShortPathNameW(_p, _buf, 1024):
-                os.environ[_var] = _buf.value
+    # Tcl 8.6, TCL_LIBRARY/TK_LIBRARY ortam değişkenlerini ANSI kod sayfasıyla okur: yoldaki ş, ı gibi harfler
+    # (ör. kullanıcı adı "Meşedibi") o kod sayfasında yoksa bozulur, init.tcl bulunamaz. 8.3 kısa yollar da
+    # çoğu Windows 10'da kapalı. Program klasörüne geçip göreli, her zaman ASCII yol veririz.
+    os.chdir(os.path.dirname(sys.executable))
+    for _var, _sub in (("TCL_LIBRARY", "tcl"), ("TK_LIBRARY", "tk")):
+        if os.path.isdir(_sub):
+            os.environ[_var] = _sub
 
 import tkinter as tk  # noqa: E402
 from tkinter import filedialog, font as tkfont, messagebox  # noqa: E402
@@ -36,7 +34,7 @@ from ttkbootstrap.style import Colors, ThemeDefinition  # noqa: E402
 from ttkbootstrap.dialogs import MessageDialog  # noqa: E402
 from ttkbootstrap.icons import Icon  # noqa: E402
 
-APP, VERSION = "Zilli", "1.1.0"
+APP, VERSION = "Zilli", "1.1.1"
 BASE = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
 # Windows'ta program kullanıcı klasörüne kurulur (yazılabilir); Linux'ta AppImage/deb salt okunur, veriler ~/Zilli'de.
@@ -927,6 +925,8 @@ class App:
     def add_file(self, folder, after=None):
         src = filedialog.askopenfilename(title="Ses dosyası seçin", filetypes=[
             ("Ses dosyaları", " ".join("*" + e for e in AUDIO_EXT)), ("Tüm dosyalar", "*")])
+        if getattr(sys, "frozen", False):
+            os.chdir(BASE)  # Windows dosya penceresi çalışma klasörünü değiştirebilir; Tcl göreli yollara bağlı
         if not src:
             return
         dst = os.path.join(folder, os.path.basename(src))
