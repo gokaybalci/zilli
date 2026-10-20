@@ -26,7 +26,7 @@ Hazır paketler [Releases](../../releases) sayfasındadır:
 - **Ayarlar:** üç tema (Açık, Gece, Yüksek kontrast; tüm yazılar WCAG okunurluk oranlarını karşılar), açılışta otomatik başlatma
 - **Sistem tepsisi:** pencere kapatılırken küçültme sorulur; küçültülünce görev çubuğunda yer kaplamaz, tepsi simgesinden açılır. Linux'ta StatusNotifierItem (KDE, GNOME AppIndicator, XFCE, Cinnamon), yoksa eski XEmbed tepsisi kullanılır
 - Bilgisayar uykudan uyanırsa 1 dakikadan eski zilleri çalmaz; aynı anda iki kopya açılmaz; ayarlar elektrik kesintisinde bozulmaz
-- Eksik veya bozuk ses dosyası programı durdurmaz: Melodiler sayfasında "Ses dosyası yok" yazar, elle çalınınca hata penceresi açılır, zamanlı zilde "Son olaylar"a yazılır. Bozuk ayar dosyası `zilli.json.bozuk` olarak kenara alınır, varsayılanlarla açılır
+- Eksik veya bozuk ses dosyası programı durdurmaz: Melodiler sayfasında "Ses dosyası yok" yazar, elle çalınınca hata penceresi açılır, zamanlı zilde "Olay kaydı"na yazılır. Bozuk ayar dosyası `zilli.json.bozuk` olarak kenara alınır, varsayılanlarla açılır
 
 Ses biçimleri: mp3, wav, ogg, flac (mid yalnız Windows'ta).
 

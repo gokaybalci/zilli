@@ -61,4 +61,13 @@ if grep -rl "Wine builtin DLL" build/win/Zilli --include='*.dll' --include='*.py
     echo "HATA: pakette wine DLL'i var" >&2; exit 1
 fi
 (cd packaging/windows && wine 'C:\inno\ISCC.exe' /Q zilli.iss)
+
+# Türkçe harfli kurulum yolunda açılıyor mu (1.1.0: "Can't find a usable init.tcl"). İngilizce kod sayfasında
+# (cp1252) "ş" yoktur; ayrı bir wine ortamına kurulur, "--check" pencereyi açıp kapatır, hata olursa betik durur.
+CHECK_DIR='C:\Users\Meşedibi\AppData\Local\Programs\Zilli'
+( export WINEPREFIX="$PWD/build/wine-check" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+  wineboot -i >/dev/null 2>&1
+  wine "dist/Zilli-Kurulum-$ZILLI_VERSION.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TASKS= /DIR="$CHECK_DIR"
+  SDL_AUDIODRIVER=dummy timeout 120 xvfb-run -a wine "$CHECK_DIR\Zilli.exe" --check )
+echo "Türkçe kurulum yolu: Zilli açıldı"
 ls -la dist/

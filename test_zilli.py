@@ -182,4 +182,15 @@ assert set(THEME_EXTRA) == set(THEME_COLORS) == {k for k, _ in THEMES}
 assert all(set(x) == set(THEME_EXTRA["acik"]) for x in THEME_EXTRA.values())
 assert check_config(merge(copy.deepcopy(DEFAULT_CONFIG), {"theme": "flatly"}))["theme"] == "acik"
 assert check_config(merge(copy.deepcopy(DEFAULT_CONFIG), {"theme": "gece"}))["theme"] == "gece"
+# pygame ses kitaplığı yüklenemezse (ör. sistemde GLib yok) Zilli çökmez: zil hatası kayda yazılır, kapanış çalışır
+class _NoMixer:
+    def __getattr__(self, name):
+        raise NotImplementedError("mixer module not available")
+_mixer, zilli.pygame.mixer = zilli.pygame.mixer, _NoMixer()
+_p = zilli.Player()
+_p.play([(__file__, 50)], "zil")
+assert _p.error.startswith("Ses aygıtı açılamadı") and _p.kind is None
+_p.poll()
+_p.stop()
+zilli.pygame.mixer = _mixer
 print("test_zilli OK")

@@ -13,6 +13,7 @@ IMAGE=ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b
 PY_SHA=9f2d5962c2583e67ef75924cd56d0c1af78bf45ec57035cf8a2cc09f74f4bf78
 TOOL_URL=https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
 TOOL_SHA=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+NEW_IMAGE=ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
 mkdir -p dist build
 
 docker run --rm -v "$PWD:/src" -v "$(realpath "$SOUNDS"):/sounds:ro" -e VERSION="$VERSION" -e PYVER=$PYVER \
@@ -85,7 +86,7 @@ Version: $VERSION
 Section: education
 Priority: optional
 Architecture: amd64
-Depends: libc6 (>= 2.27), libx11-6, libxext6, libxrender1, libfontconfig1, libfreetype6
+Depends: libc6 (>= 2.27), libx11-6, libxext6, libxrender1, libfontconfig1, libfreetype6, libglib2.0-0 | libglib2.0-0t64
 Installed-Size: $(du -sk $D/opt | cut -f1)
 Maintainer: Gökay
 Description: Okul zil programı
@@ -109,4 +110,16 @@ TOOL=build/appimagetool-1.9.1-x86_64.AppImage
 echo "$TOOL_SHA  $TOOL" | sha256sum -c --quiet
 chmod +x $TOOL
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 $TOOL -n "$PWD/$A" "$PWD/dist/Zilli-x86_64.AppImage" >/dev/null
+
+# yeni bir dağıtımda da açılıyor mu: 18.04'te olup yenilerde olmayan kitaplıklar (libffi.so.6 gibi) burada yakalanır.
+# Yalnız .deb'in Depends satırındakiler kurulur (+ sanal ekran Xvfb). GLib: pygame'in ses kitaplığı (fluidsynth) ister.
+docker run --rm -v "$PWD/dist:/dist:ro" $NEW_IMAGE bash -euo pipefail -c '
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq --no-install-recommends xvfb libx11-6 libxext6 libxrender1 libfontconfig1 libfreetype6 \
+    libglib2.0-0t64 >/dev/null
+Xvfb :1 >/dev/null 2>&1 &
+sleep 2
+cd /tmp && DISPLAY=:1 SDL_AUDIODRIVER=dummy ZILLI_DATA=/tmp/z APPIMAGE_EXTRACT_AND_RUN=1 /dist/Zilli-x86_64.AppImage --check
+echo "Ubuntu 24.04: Zilli açıldı"'
 ls -la dist/

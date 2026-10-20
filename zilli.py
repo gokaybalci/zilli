@@ -493,6 +493,13 @@ def missing_error(items):
     return "Ses dosyası yok: " + ", ".join(missing) if missing else ""
 
 
+def mixer_on():
+    try:
+        return pygame.mixer.get_init()
+    except NotImplementedError:  # pygame ses kitaplığını yükleyemediyse mixer yerinde hata veren bir yer tutucu olur
+        return None
+
+
 class Player:
     """Tek ses kanalı: zil, marş ve müzik sırayla çalar, üst üste binmez."""
 
@@ -501,10 +508,10 @@ class Player:
 
     def play(self, items, kind):
         """items: [(dosya_yolu, ses 0-100), ...]"""
-        if not pygame.mixer.get_init():
+        if not mixer_on():
             try:
                 pygame.mixer.init(44100, -16, 2, 2048)
-            except pygame.error as ex:
+            except (pygame.error, NotImplementedError) as ex:
                 self.error = "Ses aygıtı açılamadı: %s" % ex
                 return
         self.error = missing_error(items)
@@ -532,7 +539,7 @@ class Player:
 
     def stop(self, fade_ms=0):
         self.queue, self.kind, self.title = [], None, ""
-        if pygame.mixer.get_init():
+        if mixer_on():
             if fade_ms:
                 pygame.mixer.music.fadeout(fade_ms)
             else:
@@ -799,6 +806,8 @@ class App:
         for d in (self.clock, self.countdown):
             d.colors(c.bg, c.fg, c.secondary)
         self.timeline.configure(bg=c.bg)
+        for cv in self.scrollers:
+            cv.configure(bg=c.bg)
         self.next_at.configure(foreground=x["brass_text"])
         self.draw_timeline()
         self.sched_key = None
@@ -904,7 +913,7 @@ class App:
         return ttk.Labelframe(parent, text=title, padding=(0, 10, 0, 0))
 
     def hint(self, parent, text, **kw):
-        return ttk.Label(parent, text=text, bootstyle="secondary", wraplength=kw.pop("wrap", 480), **kw)
+        return ttk.Label(parent, text=text, bootstyle="secondary", wraplength=480, **kw)
 
     def add_log(self, text):
         self.log.insert("", 0, values=(datetime.datetime.now().strftime("%H:%M:%S"), text))
@@ -1102,7 +1111,7 @@ class App:
         off.bind("<<ComboboxSelected>>", off_changed)
         holder = ttk.Frame(p)
         holder.pack(fill="both", expand=True, pady=(18, 0))
-        self.day_frames, self.previews = {}, []
+        self.day_frames, self.previews, self.scrollers = {}, [], []
         for key, name in DAYS:
             self.day_frames[key] = self.day_editor(holder, key, name)
         self.show_day()
@@ -1134,8 +1143,33 @@ class App:
                         command=toggled).pack(side="left")
         self.hint(f, "Saatleri 08:30 biçiminde yazın. Öğrenci zili, yukarıda seçilen süre kadar önce çalar.").pack(
             anchor="w", pady=(6, 10))
-        grid = ttk.Frame(f)
-        grid.pack(fill="x")
+        # ders listesi kayar: 16 derse kadar küçük pencerede de Kaydet görünür kalır
+        box = ttk.Frame(f)
+        box.pack(fill="both", expand=True)
+        cv = tk.Canvas(box, highlightthickness=0, bd=0, autostyle=False)
+        bar = ttk.Scrollbar(box, orient="vertical", command=cv.yview)
+        cv.configure(yscrollcommand=bar.set)
+        cv.pack(side="left", fill="both", expand=True)
+        grid = ttk.Frame(cv)
+        cv.create_window(0, 0, window=grid, anchor="nw")
+        self.scrollers.append(cv)
+
+        def fit(_=None):
+            cv.configure(scrollregion=(0, 0, grid.winfo_reqwidth(), grid.winfo_reqheight()))
+            if grid.winfo_reqheight() > cv.winfo_height() > 1:
+                bar.pack(side="right", fill="y", before=cv)
+            else:
+                bar.pack_forget()
+                cv.yview_moveto(0)
+        grid.bind("<Configure>", fit)
+        cv.bind("<Configure>", fit)
+
+        def wheel(e):
+            if bar.winfo_ismapped():
+                cv.yview_scroll(-1 if e.num == 4 or e.delta > 0 else 1, "units")
+        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):  # Windows / Linux X11; satırlar render()'da
+            cv.bind(seq, wheel)
+            grid.bind(seq, wheel)
         values = [list(l) for l in day["lessons"]]
         rows = []
 
@@ -1150,22 +1184,23 @@ class App:
             for w in grid.winfo_children():
                 w.destroy()
             del rows[:]
-            per_col = 8 if len(values) > 8 else max(len(values), 1)
-            for i, (s, e) in enumerate(values):
-                r, c = i % per_col, i // per_col * 6
+            for r, (s, e) in enumerate(values):
                 sv, ev = tk.StringVar(value=s), tk.StringVar(value=e)
-                ttk.Label(grid, text="%d. ders" % (i + 1), width=7).grid(row=r, column=c, sticky="w",
-                                                                          padx=(28 if c else 0, 6), pady=3)
-                ttk.Entry(grid, textvariable=sv, width=6, justify="center").grid(row=r, column=c + 1, pady=3)
-                ttk.Label(grid, text="–").grid(row=r, column=c + 2, padx=6)
-                ttk.Entry(grid, textvariable=ev, width=6, justify="center").grid(row=r, column=c + 3, pady=3)
+                ttk.Label(grid, text="%d. ders" % (r + 1), width=7).grid(row=r, column=0, sticky="w",
+                                                                          padx=(0, 6), pady=3)
+                ttk.Entry(grid, textvariable=sv, width=6, justify="center").grid(row=r, column=1, pady=3)
+                ttk.Label(grid, text="–").grid(row=r, column=2, padx=6)
+                ttk.Entry(grid, textvariable=ev, width=6, justify="center").grid(row=r, column=3, pady=3)
                 lbl = ttk.Label(grid, bootstyle="secondary", width=17)
-                lbl.grid(row=r, column=c + 4, sticky="w", padx=(12, 0))
+                lbl.grid(row=r, column=4, sticky="w", padx=(12, 0))
                 ttk.Button(grid, text="Sil", bootstyle="secondary-link", padding=(4, 0),
-                           command=lambda i=i: remove(i)).grid(row=r, column=c + 5)
+                           command=lambda i=r: remove(i)).grid(row=r, column=5)
                 sv.trace_add("write", lambda *_, sv=sv, lbl=lbl: preview(sv, lbl))
                 preview(sv, lbl)
                 rows.append((sv, ev, lbl))
+            for w in grid.winfo_children():  # tekerlek satırların üstündeyken de kaydırsın
+                for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                    w.bind(seq, wheel)
 
         def sync():  # ekrandaki değerleri listeye al (ekle/sil yeniden çizmeden önce)
             values[:] = [[s.get(), e.get()] for s, e, _ in rows]
@@ -1180,6 +1215,9 @@ class App:
             except ValueError:
                 values.append(["", ""])
             render()
+            grid.update_idletasks()  # yeni ders görünsün
+            fit()
+            cv.yview_moveto(1)
 
         def remove(i):
             sync()
@@ -1204,10 +1242,8 @@ class App:
             messagebox.showinfo(APP, "%s ders saatleri kaydedildi." % name)
         render()
         self.previews.append(lambda: [preview(sv, lbl) for sv, _, lbl in rows])
-        bar = ttk.Frame(f)
-        bar.pack(fill="x", pady=(14, 0))
-        ttk.Button(bar, text="Ders ekle", bootstyle="success-outline", command=add).pack(side="left")
-        ttk.Button(bar, text="Kaydet", bootstyle="primary", padding=(22, 6), command=save).pack(side="right")
+        ttk.Button(head, text="Kaydet", bootstyle="primary", padding=(22, 6), command=save).pack(side="right")
+        ttk.Button(head, text="Ders ekle", bootstyle="success-outline", command=add).pack(side="right", padx=(0, 10))
         return f
 
     def bell_row(self, grid, r, key):
@@ -1547,8 +1583,9 @@ def bind_lock(port=SINGLE_PORT):
 
 
 def main():
-    lock = bind_lock()
-    if lock is None:
+    check = "--check" in sys.argv  # derleme sınaması (build.sh): pencere, Tcl/Tk, tema ve yazı tipi açılıyor mu
+    lock = None if check else bind_lock()
+    if lock is None and not check:
         try:  # zaten çalışıyor: açık pencereyi öne getir
             socket.create_connection(("127.0.0.1", SINGLE_PORT), timeout=2).sendall(b"show")
         except OSError:
@@ -1576,6 +1613,12 @@ def main():
     app = App(root, cfg)
     root.update_idletasks()
     root.place_window_center()  # kayıtlı/varsayılan konum ekran dışında kalmasın
+    if check:
+        root.update()
+        app.player.play([], "check")  # ses kitaplığı açılıyor mu (SDL_AUDIODRIVER=dummy ile aygıtsız da)
+        ok = app.F == FONT_FAMILY and not app.player.error
+        app.exit_app()
+        sys.exit(0 if ok else 3)
     threading.Thread(target=app.listen, args=(lock,), daemon=True).start()
     if err:
         messagebox.showwarning(APP, err)
